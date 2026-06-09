@@ -1,0 +1,17 @@
+{
+  "name": "@botiverse/slock-claude-plugins",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter @botiverse/slock-claude-channel build",
+    "test": "pnpm --filter @botiverse/slock-claude-channel test",
+    "typecheck": "pnpm --filter @botiverse/slock-claude-channel typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.25.0"
+}
+

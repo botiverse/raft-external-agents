@@ -1,0 +1,16 @@
+{
+  "name": "slock-channel",
+  "version": "0.1.0",
+  "description": "Slock channel plugin for operator-managed Claude Code sessions.",
+  "mcpServers": {
+    "slock": {
+      "command": "node",
+      "args": ["dist/index.js"],
+      "env": {
+        "SLOCK_CLAUDE_CHANNEL_HOST": "127.0.0.1",
+        "SLOCK_CLAUDE_CHANNEL_PORT": "47531"
+      }
+    }
+  }
+}
+

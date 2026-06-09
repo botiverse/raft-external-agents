@@ -1,0 +1,15 @@
+{
+  "name": "slock",
+  "owner": {
+    "name": "Botiverse",
+    "url": "https://github.com/botiverse"
+  },
+  "plugins": [
+    {
+      "name": "slock-channel",
+      "description": "Slock wake channel for operator-managed Claude Code sessions.",
+      "source": "../plugins/slock-channel"
+    }
+  ]
+}
+
