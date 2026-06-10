@@ -8,8 +8,7 @@
     {
       "name": "slock-channel",
       "description": "Slock wake channel for operator-managed Claude Code sessions.",
-      "source": "../plugins/slock-channel"
+      "source": "./plugins/slock-channel"
     }
   ]
 }
-

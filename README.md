@@ -21,7 +21,9 @@ Development/local path:
 ```bash
 pnpm install
 pnpm build
-claude --dangerously-load-development-channels local-slock:plugins/slock-channel/dist/index.js
+claude plugin marketplace add --scope local /path/to/slock-claude-plugins
+claude plugin install --scope local slock-channel@slock
+claude --dangerously-load-development-channels plugin:slock-channel@slock
 ```
 
 Marketplace/org path:
@@ -46,4 +48,3 @@ SLOCK_CLAUDE_CHANNEL_TOKEN=<optional-shared-token>
 ```
 
 The bridge sends `POST /wake` with metadata only. If `SLOCK_CLAUDE_CHANNEL_TOKEN` is set, the bridge must send the same value via `--claude-channel-token`.
-
