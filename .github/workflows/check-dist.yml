@@ -1,0 +1,37 @@
+name: check-dist
+
+# The Claude Code marketplace install path clones this repo into the plugin
+# cache WITHOUT running install/build, so the committed dist/ must always be
+# the fresh build output of src/ (task #64: a stale or missing dist makes
+# every marketplace install fail with `MCP error -32000: Connection closed`).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check-dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+      - name: dist must match src (rebuild and diff)
+        run: |
+          if ! git diff --exit-code plugins/slock-channel/dist; then
+            echo "::error::plugins/slock-channel/dist is out of date. Run 'pnpm build' and commit the result."
+            exit 1
+          fi
+      - name: bundled entry must run without node_modules
+        run: |
+          tmp="$(mktemp -d)"
+          cp plugins/slock-channel/dist/index.js "$tmp/"
+          cd "$tmp"
+          SLOCK_CLAUDE_CHANNEL_PORT=0 SLOCK_CLAUDE_CHANNEL_BRIDGE_MODE=attach SLOCK_CLAUDE_CHANNEL_TOKEN=ci timeout 5 node index.js < /dev/null 2>&1 | tee out.log || true
+          grep -q "wake endpoint listening" out.log
