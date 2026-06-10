@@ -2,6 +2,10 @@
   "name": "slock-channel",
   "version": "0.1.0",
   "description": "Slock channel plugin for operator-managed Claude Code sessions.",
+  "author": {
+    "name": "Botiverse",
+    "url": "https://github.com/botiverse"
+  },
   "mcpServers": {
     "slock": {
       "command": "node",

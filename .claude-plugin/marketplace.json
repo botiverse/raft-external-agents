@@ -1,5 +1,6 @@
 {
   "name": "slock",
+  "description": "Botiverse Slock Claude Code plugins.",
   "owner": {
     "name": "Botiverse",
     "url": "https://github.com/botiverse"
