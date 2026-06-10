@@ -5,7 +5,7 @@
   "mcpServers": {
     "slock": {
       "command": "node",
-      "args": ["dist/index.js"],
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"],
       "env": {
         "SLOCK_CLAUDE_CHANNEL_HOST": "127.0.0.1",
         "SLOCK_CLAUDE_CHANNEL_PORT": "47531"
@@ -13,4 +13,3 @@
     }
   }
 }
-
