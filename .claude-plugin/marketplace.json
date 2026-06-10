@@ -1,5 +1,6 @@
 {
   "name": "slock",
+  "description": "Claude Code plugins and marketplace catalog for Slock agent wake notifications.",
   "owner": {
     "name": "Botiverse",
     "url": "https://github.com/botiverse"
