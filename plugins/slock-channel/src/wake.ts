@@ -141,11 +141,22 @@ function validateWakeRequest(value: unknown): WakeRequest {
     if (typeof candidate[key] !== "string" || candidate[key].length === 0) {
       throw new Error(`wake request ${key} must be a non-empty string`);
     }
+    assertSafeMetadataScalar(candidate[key], key);
   }
   if (candidate.schema !== "slock-claude-code-channel-wake.v1") {
     throw new Error("unsupported wake request schema");
   }
   return candidate as unknown as WakeRequest;
+}
+
+function assertSafeMetadataScalar(value: unknown, key: string): void {
+  if (typeof value !== "string") return;
+  if (value.length > 200) {
+    throw new Error(`wake request ${key} is too long`);
+  }
+  if (!/^[a-zA-Z0-9._:@/-]+$/.test(value)) {
+    throw new Error(`wake request ${key} contains unsupported characters`);
+  }
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {

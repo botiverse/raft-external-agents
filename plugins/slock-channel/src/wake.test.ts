@@ -64,3 +64,52 @@ test("wake server accepts metadata wake and rejects invalid token", async () => 
   }
 });
 
+test("wake server requires token when configured and does not notify on unauthorized POST", async () => {
+  let notified = false;
+  const server = await startWakeServer({
+    host: "127.0.0.1",
+    port: 0,
+    token: "secret",
+    notifier: {
+      async notify() {
+        notified = true;
+      },
+    },
+  });
+  try {
+    const rejected = await fetch(server.url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    assert.equal(rejected.status, 401);
+    assert.equal(notified, false);
+  } finally {
+    await server.close();
+  }
+});
+
+test("wake server rejects unsafe metadata before notification", async () => {
+  let notified = false;
+  const server = await startWakeServer({
+    host: "127.0.0.1",
+    port: 0,
+    token: "secret",
+    notifier: {
+      async notify() {
+        notified = true;
+      },
+    },
+  });
+  try {
+    const rejected = await fetch(server.url, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-slock-bridge-token": "secret" },
+      body: JSON.stringify({ ...request, messageId: "message-1\ninject" }),
+    });
+    assert.equal(rejected.status, 400);
+    assert.equal(notified, false);
+  } finally {
+    await server.close();
+  }
+});

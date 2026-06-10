@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --test dist/*.test.js",
+    "test": "node --test dist/bridge.test.js dist/index.test.js dist/wake.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -20,4 +20,3 @@
     "typescript": "^5.9.3"
   }
 }
-

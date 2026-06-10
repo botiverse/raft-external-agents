@@ -1,0 +1,84 @@
+import assert from "node:assert/strict";
+import { spawn, type ChildProcess } from "node:child_process";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+test("plugin shuts down bridge child when MCP stdin ends", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "slock-channel-eof-"));
+  const bridgeCommand = join(dir, "fake-bridge.mjs");
+  const startedFile = join(dir, "bridge-started");
+  const terminatedFile = join(dir, "bridge-terminated");
+  const pluginEntry = fileURLToPath(new URL("./index.js", import.meta.url));
+  let plugin: ChildProcess | undefined;
+
+  try {
+    await writeFile(bridgeCommand, [
+      "#!/usr/bin/env node",
+      "import { writeFileSync } from 'node:fs';",
+      "writeFileSync(process.env.BRIDGE_STARTED_FILE, 'started');",
+      "process.on('SIGTERM', () => {",
+      "  writeFileSync(process.env.BRIDGE_TERMINATED_FILE, 'terminated');",
+      "  process.exit(0);",
+      "});",
+      "setInterval(() => {}, 1_000);",
+      "",
+    ].join("\n"));
+    await chmod(bridgeCommand, 0o700);
+
+    plugin = spawn(process.execPath, [pluginEntry], {
+      env: {
+        ...process.env,
+        SLOCK_PROFILE: "agent-profile",
+        SLOCK_CLAUDE_CHANNEL_BRIDGE_COMMAND: bridgeCommand,
+        SLOCK_CLAUDE_CHANNEL_PORT: "0",
+        BRIDGE_STARTED_FILE: startedFile,
+        BRIDGE_TERMINATED_FILE: terminatedFile,
+      },
+      stdio: ["pipe", "ignore", "pipe"],
+    });
+    const stderrChunks: Buffer[] = [];
+    plugin.stderr?.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
+
+    await waitForFile(startedFile, 5_000, "bridge child to start");
+    plugin.stdin?.end();
+
+    const exit = await waitForExit(plugin, 5_000);
+    assert.equal(exit.code, 0, Buffer.concat(stderrChunks).toString("utf8"));
+    assert.equal(await readFile(terminatedFile, "utf8"), "terminated");
+  } finally {
+    if (plugin && plugin.exitCode === null) plugin.kill("SIGKILL");
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+async function waitForFile(path: string, timeoutMs: number, label: string): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await readFile(path);
+      return;
+    } catch {
+      await delay(50);
+    }
+  }
+  throw new Error(`Timed out waiting for ${label}`);
+}
+
+function waitForExit(child: ChildProcess, timeoutMs: number): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("Timed out waiting for plugin process to exit"));
+    }, timeoutMs);
+    child.once("exit", (code, signal) => {
+      clearTimeout(timer);
+      resolve({ code, signal });
+    });
+  });
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
