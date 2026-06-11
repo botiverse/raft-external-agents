@@ -26,6 +26,11 @@ are compatible aliases of the same contract).
   (env, for spawn mode), the endpoint, and a per-session shared token. Message
   bodies never cross this transport; the agent drains them itself via the
   `slock` CLI (EAB-1/2/3 stay the CLI's business).
+- If the runtime's adapter interface forces an outbound send method to exist,
+  it MUST NOT silently no-op: return/log an explicit "use the slock CLI
+  (`slock message send --target <source target>`)" redirect instead. A silent
+  no-op lets the model believe it replied when nothing reached Slock — the
+  outbound twin of the "received-but-discarded" wake failure mode.
 
 ## Request
 
