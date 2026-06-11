@@ -15484,12 +15484,22 @@ function buildBridgeStatusArgs(config2) {
   return buildBridgeArgs(config2);
 }
 var BridgeSupervisor = class {
-  constructor(config2) {
+  constructor(config2, restart = {}) {
     this.config = config2;
     this.status = this.initialStatus(config2);
+    this.restartBaseMs = restart.baseDelayMs ?? 1e3;
+    this.restartMaxMs = restart.maxDelayMs ?? 6e4;
+    this.stableAfterMs = restart.stableAfterMs ?? 6e4;
   }
   child;
   status;
+  restartTimer;
+  spawnedAtMs;
+  consecutiveFastExits = 0;
+  restartCount = 0;
+  restartBaseMs;
+  restartMaxMs;
+  stableAfterMs;
   start() {
     if (this.config.mode === "attach") {
       return this.status;
@@ -15522,10 +15532,12 @@ var BridgeSupervisor = class {
     });
     this.child = child;
     child.once("spawn", () => {
+      this.spawnedAtMs = Date.now();
       this.status = {
         ...this.status,
         state: "running",
-        pid: child.pid
+        pid: child.pid,
+        ...this.restartCount > 0 ? { restartCount: this.restartCount } : {}
       };
       console.error(`Slock bridge child started pid=${child.pid} profile=${this.config.profile}`);
     });
@@ -15540,21 +15552,56 @@ var BridgeSupervisor = class {
       console.error(`Slock bridge child failed to start: ${err.message}`);
     });
     child.once("exit", (exitCode, signal) => {
+      const deliberatelyStopped = this.status.state === "stopped";
       this.status = {
         ...this.status,
-        state: this.status.state === "stopped" ? "stopped" : "exited",
+        state: deliberatelyStopped ? "stopped" : "exited",
         exitCode,
         signal,
         exitedAt: (/* @__PURE__ */ new Date()).toISOString()
       };
       this.child = void 0;
       console.error(`Slock bridge child exited code=${exitCode ?? "null"} signal=${signal ?? "null"}`);
+      if (!deliberatelyStopped) {
+        this.scheduleRestart();
+      }
     });
     if (child.stdout) pipeLines(child.stdout, "slock bridge stdout");
     if (child.stderr) pipeLines(child.stderr, "slock bridge stderr");
     return this.status;
   }
+  scheduleRestart() {
+    if (this.restartTimer) return;
+    const aliveMs = this.spawnedAtMs ? Date.now() - this.spawnedAtMs : 0;
+    if (aliveMs >= this.stableAfterMs) {
+      this.consecutiveFastExits = 0;
+    } else {
+      this.consecutiveFastExits += 1;
+    }
+    const delayMs = Math.min(
+      this.restartBaseMs * 2 ** Math.max(0, this.consecutiveFastExits - 1),
+      this.restartMaxMs
+    );
+    this.restartCount += 1;
+    this.status = {
+      ...this.status,
+      state: "restarting",
+      restartCount: this.restartCount,
+      nextRestartDelayMs: delayMs
+    };
+    console.error(`Slock bridge child restart #${this.restartCount} scheduled in ${delayMs}ms`);
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = void 0;
+      if (this.status.state === "stopped") return;
+      this.start();
+    }, delayMs);
+    this.restartTimer.unref?.();
+  }
   async stop() {
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = void 0;
+    }
     if (!this.child) {
       this.status = {
         ...this.status,
