@@ -54,7 +54,16 @@ no channel name, no sender identity):
 ```
 
 (The `schema` id keeps its historical Claude Code name on the wire for
-compatibility; semantics are runtime-neutral.)
+compatibility; semantics are runtime-neutral. Endpoints SHOULD either skip
+validating the `schema` field or accept this exact value — do not invent a
+neutral-looking id to validate against; schema-id evolution goes through this
+contract, never a silent wire change.)
+
+The endpoint SHOULD reject (`400`) payloads carrying content-shaped fields
+(`text`, `content`, `message(s)`, `body`, `preview`, `snippet`, …): the
+transport is content-free by contract, and rejecting violations loudly beats
+silently forwarding a body into the runtime. (Adopted from the Hermes
+implementation's guard.)
 
 ## Response
 
