@@ -15469,8 +15469,16 @@ function readBridgeConfig(env, endpoint, token2, explicitToken2) {
     explicitToken: explicitToken2
   };
 }
-function bridgeSpawnOptions(platform) {
-  return { shell: platform === "win32" };
+function bridgeSpawnPlan(platform, command, args) {
+  if (platform !== "win32") {
+    return { command, args, options: { shell: false } };
+  }
+  const quote = (token2) => `"${token2.replaceAll('"', '"')}"`;
+  return {
+    command: [command, ...args].map(quote).join(" "),
+    args: [],
+    options: { shell: true }
+  };
 }
 function buildBridgeArgs(config2) {
   return [
@@ -15529,10 +15537,11 @@ var BridgeSupervisor = class {
       SLOCK_PROFILE: this.config.profile,
       SLOCK_CLAUDE_CHANNEL_TOKEN: this.config.token
     };
-    const child = spawn(this.config.command, args, {
+    const plan = bridgeSpawnPlan(process.platform, this.config.command, args);
+    const child = spawn(plan.command, plan.args, {
       env,
       stdio: ["ignore", "pipe", "pipe"],
-      ...bridgeSpawnOptions(process.platform)
+      ...plan.options
     });
     this.child = child;
     child.once("spawn", () => {

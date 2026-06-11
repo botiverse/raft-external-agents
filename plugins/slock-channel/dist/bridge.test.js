@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BridgeSupervisor, bridgeSpawnOptions, buildBridgeArgs, buildBridgeStatusArgs, readBridgeConfig } from "./bridge.js";
+import { BridgeSupervisor, bridgeSpawnPlan, buildBridgeArgs, buildBridgeStatusArgs, readBridgeConfig } from "./bridge.js";
 test("bridge args do not expose the wake token", () => {
     const config = {
         mode: "spawn",
@@ -91,8 +91,13 @@ test("supervisor respawns an unexpectedly exited bridge child with backoff", asy
 // Windows field bug (#wg-external-agent 2026-06-11): npm exposes the CLI as
 // `slock.cmd`, which Node's spawn() cannot resolve without a shell — the
 // bridge child died with `spawn slock ENOENT` on every Windows install.
-test("bridge child spawns through the shell on win32 and directly elsewhere", () => {
-    assert.deepEqual(bridgeSpawnOptions("win32"), { shell: true });
-    assert.deepEqual(bridgeSpawnOptions("linux"), { shell: false });
-    assert.deepEqual(bridgeSpawnOptions("darwin"), { shell: false });
+// Shell + args-array would trigger DEP0190, so win32 gets ONE fully-quoted
+// command string (paths with spaces survive); other platforms unchanged.
+test("bridge child spawn plan: quoted shell string on win32, direct argv elsewhere", () => {
+    const direct = bridgeSpawnPlan("linux", "slock", ["agent", "bridge", "--json"]);
+    assert.deepEqual(direct, { command: "slock", args: ["agent", "bridge", "--json"], options: { shell: false } });
+    const win = bridgeSpawnPlan("win32", "C:\\Program Files\\slock\\slock.cmd", ["agent", "bridge", "--wake-endpoint", "http://127.0.0.1:8646/wake"]);
+    assert.equal(win.options.shell, true);
+    assert.deepEqual(win.args, [], "win32 must pass a single string, not an args array (DEP0190)");
+    assert.equal(win.command, '"C:\\Program Files\\slock\\slock.cmd" "agent" "bridge" "--wake-endpoint" "http://127.0.0.1:8646/wake"');
 });
