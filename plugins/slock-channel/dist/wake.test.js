@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { channelContent, channelMeta, startWakeServer } from "./wake.js";
+import { DebouncedWakeNotifier, channelBatchContent, channelBatchMeta, channelContent, channelMeta, startWakeServer, } from "./wake.js";
 const request = {
     schema: "slock-claude-code-channel-wake.v1",
     attemptId: "attempt-1",
@@ -11,6 +11,12 @@ const request = {
     coreSessionId: "core-1",
     adapterInstance: "adapter-1",
     occurredAt: "2026-06-09T15:00:00.000Z",
+};
+const secondRequest = {
+    ...request,
+    attemptId: "attempt-2",
+    eventId: "event-2",
+    messageId: "message-2",
 };
 test("channel payload is content-free and maps citation metadata to underscore keys", () => {
     assert.match(channelContent(request), /slock message check/);
@@ -26,6 +32,41 @@ test("channel payload is content-free and maps citation metadata to underscore k
         slock_core_session_id: "core-1",
         slock_adapter_instance: "adapter-1",
     });
+});
+test("batched channel payload coalesces wake hints without message bodies", () => {
+    const content = channelBatchContent([request, secondRequest]);
+    assert.match(content, /Slock wake hints received\. pending_count=2/);
+    assert.match(content, /message_ids=message-1,message-2/);
+    assert.match(content, /slock message check/);
+    assert.doesNotMatch(content, /body|content=/);
+    assert.deepEqual(channelBatchMeta([request, secondRequest]), {
+        slock_message_id: "message-1",
+        slock_attempt_id: "attempt-1",
+        slock_event_id: "event-1",
+        slock_agent_id: "agent-1",
+        slock_profile: "profile-1",
+        slock_core_session_id: "core-1",
+        slock_adapter_instance: "adapter-1",
+        slock_wake_batch_size: "2",
+        slock_message_ids: "message-1,message-2",
+    });
+});
+test("debounced wake notifier sends the leading wake immediately and coalesces burst tails", async () => {
+    const batches = [];
+    const notifier = new DebouncedWakeNotifier({
+        debounceMs: 20,
+        notifier: {
+            async notify(wakes) {
+                batches.push([...wakes]);
+            },
+        },
+    });
+    await notifier.notify(request);
+    const coalesced = notifier.notify(secondRequest);
+    assert.equal(batches.length, 1);
+    assert.deepEqual(batches[0].map((wake) => wake.messageId), ["message-1"]);
+    await coalesced;
+    assert.equal(batches.length, 1);
 });
 test("wake server accepts metadata wake and rejects invalid token", async () => {
     const notified = [];

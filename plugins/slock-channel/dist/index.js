@@ -15734,25 +15734,94 @@ async function startWakeServer(options) {
     })
   };
 }
-function channelContent(request) {
-  return [
-    "Slock wake hint received.",
-    "If you have not read the Slock manual in this Claude Code session, run `slock manual get slock-cli-overview` before using Slock commands.",
-    `message_id=${request.messageId}`,
-    `attempt_id=${request.attemptId}`,
-    "Run `slock message check` to pull the pending message."
-  ].join("\n");
+var DebouncedWakeNotifier = class {
+  debounceMs;
+  maxBatchSize;
+  notifier;
+  pending = [];
+  timer;
+  windowSend;
+  windowActive = false;
+  constructor(options) {
+    this.debounceMs = Math.max(0, options.debounceMs);
+    this.maxBatchSize = Math.max(1, options.maxBatchSize ?? 20);
+    this.notifier = options.notifier;
+  }
+  notify(request) {
+    if (this.debounceMs === 0) {
+      return this.notifier.notify([request]);
+    }
+    if (!this.windowActive) {
+      this.windowActive = true;
+      this.windowSend = this.notifier.notify([request]);
+      this.timer = setTimeout(() => {
+        this.timer = void 0;
+        void this.closeWindow();
+      }, this.debounceMs);
+      return this.windowSend;
+    }
+    return new Promise((resolve, reject) => {
+      this.pending.push({ resolve, reject });
+      if (this.pending.length >= this.maxBatchSize) {
+        void this.closeWindow();
+      }
+    });
+  }
+  async closeWindow() {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = void 0;
+    }
+    const pending = this.pending.splice(0);
+    const windowSend = this.windowSend;
+    this.windowSend = void 0;
+    this.windowActive = false;
+    try {
+      await windowSend;
+      for (const item of pending) item.resolve();
+    } catch (err) {
+      for (const item of pending) item.reject(err);
+    }
+  }
+};
+function channelBatchContent(requests) {
+  const count = requests.length;
+  const first = requests[0];
+  const messageIds = requests.slice(0, 5).map((request) => request.messageId);
+  const lines = [
+    count > 1 ? `Slock wake hints received. pending_count=${count}` : "Slock wake hint received.",
+    "If you have not read the Slock manual in this Claude Code session, run `slock manual get slock-cli-overview` before using Slock commands."
+  ];
+  if (count > 1) {
+    lines.push(`message_ids=${messageIds.join(",")}`);
+    if (count > messageIds.length) {
+      lines.push(`additional_message_count=${count - messageIds.length}`);
+    }
+  } else {
+    lines.push(`message_id=${first.messageId}`);
+    lines.push(`attempt_id=${first.attemptId}`);
+  }
+  lines.push("Run `slock message check` to pull the pending message.");
+  return lines.join("\n");
 }
-function channelMeta(request) {
-  return {
-    slock_message_id: request.messageId,
-    slock_attempt_id: request.attemptId,
-    slock_event_id: request.eventId,
-    slock_agent_id: request.agentId,
-    slock_profile: request.profile,
-    slock_core_session_id: request.coreSessionId,
-    slock_adapter_instance: request.adapterInstance
-  };
+function channelBatchMeta(requests) {
+  const first = requests[0];
+  const messageIds = requests.slice(0, 8).map((request) => request.messageId);
+  return [
+    {
+      slock_message_id: first.messageId,
+      slock_attempt_id: first.attemptId,
+      slock_event_id: first.eventId,
+      slock_agent_id: first.agentId,
+      slock_profile: first.profile,
+      slock_core_session_id: first.coreSessionId,
+      slock_adapter_instance: first.adapterInstance
+    },
+    requests.length > 1 ? {
+      slock_wake_batch_size: String(requests.length),
+      slock_message_ids: messageIds.join(",")
+    } : {}
+  ].reduce((acc, item) => Object.assign(acc, item), {});
 }
 function validateWakeRequest(value) {
   if (!value || typeof value !== "object") throw new Error("wake request must be an object");
@@ -15804,6 +15873,8 @@ function writeJson(res, status, value) {
 // src/index.ts
 var host = process.env.SLOCK_CLAUDE_CHANNEL_HOST || "127.0.0.1";
 var port = Number(process.env.SLOCK_CLAUDE_CHANNEL_PORT || "0");
+var wakeDebounceMs = parsePositiveInt(process.env.SLOCK_CLAUDE_CHANNEL_DEBOUNCE_MS, 1e3);
+var wakeMaxBatchSize = parsePositiveInt(process.env.SLOCK_CLAUDE_CHANNEL_WAKE_MAX_BATCH_SIZE, 20);
 var explicitToken = Boolean(process.env.SLOCK_CLAUDE_CHANNEL_TOKEN);
 var token = process.env.SLOCK_CLAUDE_CHANNEL_TOKEN || randomBytes(32).toString("base64url");
 var server = new Server(
@@ -15856,17 +15927,22 @@ var wakeServer = await startWakeServer({
   host,
   port,
   token,
-  notifier: {
-    async notify(wake) {
-      await server.notification({
-        method: "notifications/claude/channel",
-        params: {
-          content: channelContent(wake),
-          meta: channelMeta(wake)
-        }
-      });
+  notifier: new DebouncedWakeNotifier({
+    debounceMs: wakeDebounceMs,
+    maxBatchSize: wakeMaxBatchSize,
+    notifier: {
+      async notify(wakes) {
+        if (wakes.length === 0) return;
+        await server.notification({
+          method: "notifications/claude/channel",
+          params: {
+            content: channelBatchContent(wakes),
+            meta: channelBatchMeta(wakes)
+          }
+        });
+      }
     }
-  }
+  })
 });
 console.error(`Slock Claude channel wake endpoint listening at ${wakeServer.url}`);
 var bridgeSupervisor = new BridgeSupervisor(readBridgeConfig(process.env, wakeServer.url, token, explicitToken));
@@ -15902,4 +15978,10 @@ async function shutdown() {
   await bridgeSupervisor.stop();
   await wakeServer.close();
   process.exit(0);
+}
+function parsePositiveInt(value, fallback) {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Math.floor(parsed);
 }

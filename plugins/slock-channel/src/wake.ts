@@ -25,6 +25,16 @@ export interface ChannelNotifier {
   notify(request: WakeRequest): Promise<void>;
 }
 
+export interface ChannelBatchNotifier {
+  notify(requests: readonly WakeRequest[]): Promise<void>;
+}
+
+export interface DebouncedWakeNotifierOptions {
+  debounceMs: number;
+  maxBatchSize?: number;
+  notifier: ChannelBatchNotifier;
+}
+
 export interface WakeServerOptions {
   host: string;
   port: number;
@@ -102,26 +112,115 @@ export async function startWakeServer(options: WakeServerOptions): Promise<Start
   };
 }
 
+type QueuedWake = {
+  resolve(): void;
+  reject(err: unknown): void;
+};
+
+export class DebouncedWakeNotifier implements ChannelNotifier {
+  private readonly debounceMs: number;
+  private readonly maxBatchSize: number;
+  private readonly notifier: ChannelBatchNotifier;
+  private pending: QueuedWake[] = [];
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private windowSend: Promise<void> | undefined;
+  private windowActive = false;
+
+  constructor(options: DebouncedWakeNotifierOptions) {
+    this.debounceMs = Math.max(0, options.debounceMs);
+    this.maxBatchSize = Math.max(1, options.maxBatchSize ?? 20);
+    this.notifier = options.notifier;
+  }
+
+  notify(request: WakeRequest): Promise<void> {
+    if (this.debounceMs === 0) {
+      return this.notifier.notify([request]);
+    }
+
+    if (!this.windowActive) {
+      this.windowActive = true;
+      this.windowSend = this.notifier.notify([request]);
+      this.timer = setTimeout(() => {
+        this.timer = undefined;
+        void this.closeWindow();
+      }, this.debounceMs);
+      return this.windowSend;
+    }
+
+    return new Promise((resolve, reject) => {
+      this.pending.push({ resolve, reject });
+      if (this.pending.length >= this.maxBatchSize) {
+        void this.closeWindow();
+      }
+    });
+  }
+
+  async closeWindow(): Promise<void> {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
+    const pending = this.pending.splice(0);
+    const windowSend = this.windowSend;
+    this.windowSend = undefined;
+    this.windowActive = false;
+
+    try {
+      await windowSend;
+      for (const item of pending) item.resolve();
+    } catch (err) {
+      for (const item of pending) item.reject(err);
+    }
+  }
+}
+
 export function channelContent(request: WakeRequest): string {
-  return [
-    "Slock wake hint received.",
+  return channelBatchContent([request]);
+}
+
+export function channelBatchContent(requests: readonly WakeRequest[]): string {
+  const count = requests.length;
+  const first = requests[0];
+  const messageIds = requests.slice(0, 5).map((request) => request.messageId);
+  const lines = [
+    count > 1 ? `Slock wake hints received. pending_count=${count}` : "Slock wake hint received.",
     "If you have not read the Slock manual in this Claude Code session, run `slock manual get slock-cli-overview` before using Slock commands.",
-    `message_id=${request.messageId}`,
-    `attempt_id=${request.attemptId}`,
-    "Run `slock message check` to pull the pending message.",
-  ].join("\n");
+  ];
+  if (count > 1) {
+    lines.push(`message_ids=${messageIds.join(",")}`);
+    if (count > messageIds.length) {
+      lines.push(`additional_message_count=${count - messageIds.length}`);
+    }
+  } else {
+    lines.push(`message_id=${first.messageId}`);
+    lines.push(`attempt_id=${first.attemptId}`);
+  }
+  lines.push("Run `slock message check` to pull the pending message.");
+  return lines.join("\n");
 }
 
 export function channelMeta(request: WakeRequest): Record<string, string> {
-  return {
-    slock_message_id: request.messageId,
-    slock_attempt_id: request.attemptId,
-    slock_event_id: request.eventId,
-    slock_agent_id: request.agentId,
-    slock_profile: request.profile,
-    slock_core_session_id: request.coreSessionId,
-    slock_adapter_instance: request.adapterInstance,
-  };
+  return channelBatchMeta([request]);
+}
+
+export function channelBatchMeta(requests: readonly WakeRequest[]): Record<string, string> {
+  const first = requests[0];
+  const messageIds = requests.slice(0, 8).map((request) => request.messageId);
+  return [
+    {
+      slock_message_id: first.messageId,
+      slock_attempt_id: first.attemptId,
+      slock_event_id: first.eventId,
+      slock_agent_id: first.agentId,
+      slock_profile: first.profile,
+      slock_core_session_id: first.coreSessionId,
+      slock_adapter_instance: first.adapterInstance,
+    },
+    requests.length > 1 ? {
+      slock_wake_batch_size: String(requests.length),
+      slock_message_ids: messageIds.join(","),
+    } : {},
+  ].reduce<Record<string, string>>((acc, item) => Object.assign(acc, item), {});
 }
 
 function validateWakeRequest(value: unknown): WakeRequest {

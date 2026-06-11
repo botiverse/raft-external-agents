@@ -49,9 +49,12 @@ Optional debug overrides:
 SLOCK_CLAUDE_CHANNEL_HOST=127.0.0.1
 SLOCK_CLAUDE_CHANNEL_PORT=47531
 SLOCK_CLAUDE_CHANNEL_TOKEN=<manual-shared-token>
+SLOCK_CLAUDE_CHANNEL_DEBOUNCE_MS=1000
+SLOCK_CLAUDE_CHANNEL_WAKE_MAX_BATCH_SIZE=20
 ```
 
 The bridge sends `POST /wake` with metadata only. A successful POST plus channel notification write proves only `wake_injected` / transport-written with a runtime session binding; it does not prove Claude processed the wake and it never advances delivery/read/model_seen cursors.
+The first wake in a debounce window is injected immediately. Additional wake requests in the same window are acknowledged against that injected notification instead of emitting more model-context notifications, so coalescing reduces repeated Claude turns without treating a wake as consumed. Set `SLOCK_CLAUDE_CHANNEL_DEBOUNCE_MS=0` to disable coalescing.
 
 ## Manual Bridge Debugging
 
