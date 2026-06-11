@@ -17,6 +17,7 @@ const request: WakeRequest = {
 
 test("channel payload is content-free and maps citation metadata to underscore keys", () => {
   assert.match(channelContent(request), /slock message check/);
+  assert.match(channelContent(request), /slock manual get slock-cli-overview/);
   assert.doesNotMatch(channelContent(request), /body|content=/);
   assert.deepEqual(channelMeta(request), {
     slock_message_id: "message-1",
