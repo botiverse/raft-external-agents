@@ -9,10 +9,18 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { BridgeSupervisor, readBridgeConfig } from "./bridge.js";
-import { channelContent, channelMeta, startWakeServer, type WakeRequest } from "./wake.js";
+import {
+  DebouncedWakeNotifier,
+  channelBatchContent,
+  channelBatchMeta,
+  startWakeServer,
+  type WakeRequest,
+} from "./wake.js";
 
 const host = process.env.SLOCK_CLAUDE_CHANNEL_HOST || "127.0.0.1";
 const port = Number(process.env.SLOCK_CLAUDE_CHANNEL_PORT || "0");
+const wakeDebounceMs = parsePositiveInt(process.env.SLOCK_CLAUDE_CHANNEL_DEBOUNCE_MS, 1000);
+const wakeMaxBatchSize = parsePositiveInt(process.env.SLOCK_CLAUDE_CHANNEL_WAKE_MAX_BATCH_SIZE, 20);
 const explicitToken = Boolean(process.env.SLOCK_CLAUDE_CHANNEL_TOKEN);
 const token = process.env.SLOCK_CLAUDE_CHANNEL_TOKEN || randomBytes(32).toString("base64url");
 
@@ -69,17 +77,22 @@ const wakeServer = await startWakeServer({
   host,
   port,
   token,
-  notifier: {
-    async notify(wake: WakeRequest) {
-      await server.notification({
-        method: "notifications/claude/channel",
-        params: {
-          content: channelContent(wake),
-          meta: channelMeta(wake),
-        },
-      });
+  notifier: new DebouncedWakeNotifier({
+    debounceMs: wakeDebounceMs,
+    maxBatchSize: wakeMaxBatchSize,
+    notifier: {
+      async notify(wakes: readonly WakeRequest[]) {
+        if (wakes.length === 0) return;
+        await server.notification({
+          method: "notifications/claude/channel",
+          params: {
+            content: channelBatchContent(wakes),
+            meta: channelBatchMeta(wakes),
+          },
+        });
+      },
     },
-  },
+  }),
 });
 
 console.error(`Slock Claude channel wake endpoint listening at ${wakeServer.url}`);
@@ -120,4 +133,11 @@ async function shutdown(): Promise<void> {
   await bridgeSupervisor.stop();
   await wakeServer.close();
   process.exit(0);
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Math.floor(parsed);
 }

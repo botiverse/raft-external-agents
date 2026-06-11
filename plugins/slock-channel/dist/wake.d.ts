@@ -19,6 +19,14 @@ export interface WakeResponse {
 export interface ChannelNotifier {
     notify(request: WakeRequest): Promise<void>;
 }
+export interface ChannelBatchNotifier {
+    notify(requests: readonly WakeRequest[]): Promise<void>;
+}
+export interface DebouncedWakeNotifierOptions {
+    debounceMs: number;
+    maxBatchSize?: number;
+    notifier: ChannelBatchNotifier;
+}
 export interface WakeServerOptions {
     host: string;
     port: number;
@@ -32,5 +40,19 @@ export interface StartedWakeServer {
     close(): Promise<void>;
 }
 export declare function startWakeServer(options: WakeServerOptions): Promise<StartedWakeServer>;
+export declare class DebouncedWakeNotifier implements ChannelNotifier {
+    private readonly debounceMs;
+    private readonly maxBatchSize;
+    private readonly notifier;
+    private pending;
+    private timer;
+    private windowSend;
+    private windowActive;
+    constructor(options: DebouncedWakeNotifierOptions);
+    notify(request: WakeRequest): Promise<void>;
+    closeWindow(): Promise<void>;
+}
 export declare function channelContent(request: WakeRequest): string;
+export declare function channelBatchContent(requests: readonly WakeRequest[]): string;
 export declare function channelMeta(request: WakeRequest): Record<string, string>;
+export declare function channelBatchMeta(requests: readonly WakeRequest[]): Record<string, string>;
