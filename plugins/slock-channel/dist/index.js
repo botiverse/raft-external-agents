@@ -15690,7 +15690,7 @@ async function startWakeServer(options) {
 function channelContent(request) {
   return [
     "Slock wake hint received.",
-    "If you forget how to use Slock, run `slock manual get slock-cli-overview`.",
+    "If you have not read the Slock manual in this Claude Code session, run `slock manual get slock-cli-overview` before using Slock commands.",
     `message_id=${request.messageId}`,
     `attempt_id=${request.attemptId}`,
     "Run `slock message check` to pull the pending message."

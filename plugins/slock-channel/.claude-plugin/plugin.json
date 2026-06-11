@@ -1,6 +1,6 @@
 {
   "name": "slock-channel",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Slock channel plugin for Claude Code agent wake notifications.",
   "author": {
     "name": "Botiverse",
