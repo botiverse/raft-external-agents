@@ -15,13 +15,23 @@ export function readBridgeConfig(env, endpoint, token, explicitToken) {
  * Windows field bug (Ruikun, #wg-external-agent 2026-06-11): npm installs the
  * CLI as `slock.cmd`/`slock.ps1`, and Node's spawn() without `shell` does not
  * resolve `.cmd` wrappers from PATH — `spawn slock ENOENT` even though the
- * command works in a terminal. Spawn through the shell on win32 (the argv is
- * fixed and internally constructed, no user-controlled tokens). An explicit
- * SLOCK_CLAUDE_CHANNEL_BRIDGE_COMMAND full path also works without the shell
- * when it points at an .exe.
+ * command works in a terminal. Spawning through the shell fixes that, but
+ * shell + args-array triggers DEP0190 (args concatenated unescaped), so on
+ * win32 we build ONE fully-quoted command string instead: every token is
+ * double-quoted with embedded quotes escaped, which also survives
+ * SLOCK_CLAUDE_CHANNEL_BRIDGE_COMMAND paths containing spaces
+ * (`C:\Program Files\...`). All tokens are internally constructed.
  */
-export function bridgeSpawnOptions(platform) {
-    return { shell: platform === "win32" };
+export function bridgeSpawnPlan(platform, command, args) {
+    if (platform !== "win32") {
+        return { command, args, options: { shell: false } };
+    }
+    const quote = (token) => `"${token.replaceAll('"', '\"')}"`;
+    return {
+        command: [command, ...args].map(quote).join(" "),
+        args: [],
+        options: { shell: true },
+    };
 }
 export function buildBridgeArgs(config) {
     return [
@@ -81,10 +91,11 @@ export class BridgeSupervisor {
             SLOCK_PROFILE: this.config.profile,
             SLOCK_CLAUDE_CHANNEL_TOKEN: this.config.token,
         };
-        const child = spawn(this.config.command, args, {
+        const plan = bridgeSpawnPlan(process.platform, this.config.command, args);
+        const child = spawn(plan.command, plan.args, {
             env,
             stdio: ["ignore", "pipe", "pipe"],
-            ...bridgeSpawnOptions(process.platform),
+            ...plan.options,
         });
         this.child = child;
         child.once("spawn", () => {
