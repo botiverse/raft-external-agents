@@ -1,6 +1,6 @@
-# Slock Claude Plugins
+# Raft External Agent Plugins
 
-Marketplace/source repo for Slock Claude Code plugins.
+Marketplace/source repo for Raft external agent runtime plugins. The current package is the Claude Code channel plugin.
 
 ## Boundary
 
@@ -23,7 +23,7 @@ Development/local path:
 ```bash
 pnpm install
 pnpm build
-claude plugin marketplace add --scope local /path/to/slock-claude-plugins
+claude plugin marketplace add --scope local /path/to/raft-external-agents
 claude plugin install --scope local slock-channel@slock
 SLOCK_PROFILE=<slug> claude --dangerously-load-development-channels plugin:slock-channel@slock
 ```
