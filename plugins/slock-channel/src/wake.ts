@@ -105,6 +105,7 @@ export async function startWakeServer(options: WakeServerOptions): Promise<Start
 export function channelContent(request: WakeRequest): string {
   return [
     "Slock wake hint received.",
+    "If you forget how to use Slock, run `slock manual get slock-cli-overview`.",
     `message_id=${request.messageId}`,
     `attempt_id=${request.attemptId}`,
     "Run `slock message check` to pull the pending message.",
