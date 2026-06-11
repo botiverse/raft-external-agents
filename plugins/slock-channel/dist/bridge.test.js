@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BridgeSupervisor, buildBridgeArgs, buildBridgeStatusArgs, readBridgeConfig } from "./bridge.js";
+import { BridgeSupervisor, bridgeSpawnOptions, buildBridgeArgs, buildBridgeStatusArgs, readBridgeConfig } from "./bridge.js";
 test("bridge args do not expose the wake token", () => {
     const config = {
         mode: "spawn",
@@ -87,4 +87,12 @@ test("supervisor respawns an unexpectedly exited bridge child with backoff", asy
     await new Promise((resolve) => setTimeout(resolve, 300));
     assert.equal(supervisor.getStatus().restartCount ?? 0, restartsAtStop, "stop() must cancel respawn");
     assert.equal(supervisor.getStatus().state, "stopped");
+});
+// Windows field bug (#wg-external-agent 2026-06-11): npm exposes the CLI as
+// `slock.cmd`, which Node's spawn() cannot resolve without a shell — the
+// bridge child died with `spawn slock ENOENT` on every Windows install.
+test("bridge child spawns through the shell on win32 and directly elsewhere", () => {
+    assert.deepEqual(bridgeSpawnOptions("win32"), { shell: true });
+    assert.deepEqual(bridgeSpawnOptions("linux"), { shell: false });
+    assert.deepEqual(bridgeSpawnOptions("darwin"), { shell: false });
 });

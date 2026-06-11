@@ -52,6 +52,19 @@ export function readBridgeConfig(env: NodeJS.ProcessEnv, endpoint: string, token
   };
 }
 
+/**
+ * Windows field bug (Ruikun, #wg-external-agent 2026-06-11): npm installs the
+ * CLI as `slock.cmd`/`slock.ps1`, and Node's spawn() without `shell` does not
+ * resolve `.cmd` wrappers from PATH — `spawn slock ENOENT` even though the
+ * command works in a terminal. Spawn through the shell on win32 (the argv is
+ * fixed and internally constructed, no user-controlled tokens). An explicit
+ * SLOCK_CLAUDE_CHANNEL_BRIDGE_COMMAND full path also works without the shell
+ * when it points at an .exe.
+ */
+export function bridgeSpawnOptions(platform: NodeJS.Platform): { shell: boolean } {
+  return { shell: platform === "win32" };
+}
+
 export function buildBridgeArgs(config: BridgeConfig): string[] {
   return [
     "agent",
@@ -127,6 +140,7 @@ export class BridgeSupervisor {
     const child = spawn(this.config.command, args, {
       env,
       stdio: ["ignore", "pipe", "pipe"],
+      ...bridgeSpawnOptions(process.platform),
     });
     this.child = child;
 

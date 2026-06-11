@@ -15469,6 +15469,9 @@ function readBridgeConfig(env, endpoint, token2, explicitToken2) {
     explicitToken: explicitToken2
   };
 }
+function bridgeSpawnOptions(platform) {
+  return { shell: platform === "win32" };
+}
 function buildBridgeArgs(config2) {
   return [
     "agent",
@@ -15528,7 +15531,8 @@ var BridgeSupervisor = class {
     };
     const child = spawn(this.config.command, args, {
       env,
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],
+      ...bridgeSpawnOptions(process.platform)
     });
     this.child = child;
     child.once("spawn", () => {
