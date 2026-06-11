@@ -1,6 +1,6 @@
 {
   "name": "slock",
-  "description": "Claude Code plugins and marketplace catalog for Slock agent wake notifications.",
+  "description": "Raft external agent runtime plugins and marketplace catalog for Slock wake notifications.",
   "owner": {
     "name": "Botiverse",
     "url": "https://github.com/botiverse"
