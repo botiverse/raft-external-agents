@@ -1,16 +1,15 @@
-# Wake-Endpoint Contract (runtime-neutral) — v1
+# Raft Channel Wake-Endpoint Contract — v1
 
-The transport between `slock agent bridge` and a runtime's Slock channel
+The transport between `slock agent bridge` and a runtime's Raft channel
 component (Claude Code plugin today; Hermes gateway platform, OpenClaw channel
 plugin next). One page: implement this and run the EAB conformance suite, and
-your runtime gets Slock wakes with every reliability invariant the bridge
+your runtime gets Raft wakes with every reliability invariant the bridge
 already enforces (dedup, stale prune, backoff, reconciliation, observability).
 
-Status: extracted verbatim from the shipped Claude Code path (CLI ≥ 0.0.10,
-plugin ≥ 0.1.4). The bridge invokes it via
-`--wake-adapter wake-endpoint --wake-endpoint <url> [--wake-endpoint-token <token>]`
-(`claude-code-channels` / `--claude-channel-*` / `SLOCK_CLAUDE_CHANNEL_TOKEN`
-are compatible aliases of the same contract).
+Status: pure development break from the previous channel protocol. Pair
+plugin releases with the matching Slock CLI release. The bridge invokes it via
+`--wake-adapter raft-channel --raft-channel-endpoint <url>` with the shared
+token supplied through `RAFT_CHANNEL_TOKEN`.
 
 ## Division of labor (wake-only convergence, #wg-external-agent 2026-06-11)
 
@@ -21,14 +20,15 @@ are compatible aliases of the same contract).
 - **The runtime component owns exactly two things**:
   1. a localhost HTTP endpoint accepting the wake POST below;
   2. injecting a short, fixed wake notice into the agent's visible context
-     (telling it to run `slock message check`).
+     (telling it to run `raft message check`, with optional `raft profile show`
+     for identity confirmation only).
 - The runtime component holds **no Slock credential** — only the profile slug
   (env, for spawn mode), the endpoint, and a per-session shared token. Message
   bodies never cross this transport; the agent drains them itself via the
-  `slock` CLI (EAB-1/2/3 stay the CLI's business).
+  Raft/Slock CLI (EAB-1/2/3 stay the CLI's business).
 - If the runtime's adapter interface forces an outbound send method to exist,
-  it MUST NOT silently no-op: return/log an explicit "use the slock CLI
-  (`slock message send --target <source target>`)" redirect instead. A silent
+  it MUST NOT silently no-op: return/log an explicit "use the Raft CLI
+  (`raft message send --target <source target>`)" redirect instead. A silent
   no-op lets the model believe it replied when nothing reached Slock — the
   outbound twin of the "received-but-discarded" wake failure mode.
 
@@ -38,7 +38,7 @@ are compatible aliases of the same contract).
 
 Headers:
 - `content-type: application/json`
-- `x-slock-bridge-token: <token>` — present iff a token is configured.
+- `x-raft-bridge-token: <token>` — present iff a token is configured.
   The component MUST reject unauthenticated requests when it issued a token.
 
 Body (all fields metadata; **content-free is normative** — no message body,
@@ -46,7 +46,7 @@ no channel name, no sender identity):
 
 ```json
 {
-  "schema": "slock-claude-code-channel-wake.v1",
+  "schema": "raft-channel-wake.v1",
   "attemptId": "attempt_<uuid>",
   "eventId": "event_<uuid>",
   "messageId": "<slock message uuid>",
@@ -58,11 +58,9 @@ no channel name, no sender identity):
 }
 ```
 
-(The `schema` id keeps its historical Claude Code name on the wire for
-compatibility; semantics are runtime-neutral. Endpoints SHOULD either skip
-validating the `schema` field or accept this exact value — do not invent a
-neutral-looking id to validate against; schema-id evolution goes through this
-contract, never a silent wire change.)
+Endpoints SHOULD either skip validating the `schema` field or accept this exact
+value. Schema-id evolution goes through this contract, never a silent wire
+change.
 
 The endpoint SHOULD reject (`400`) payloads carrying content-shaped fields
 (`text`, `content`, `message(s)`, `body`, `preview`, `snippet`, …): the

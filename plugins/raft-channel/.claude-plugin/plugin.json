@@ -1,19 +1,19 @@
 {
-  "name": "slock-channel",
-  "version": "0.1.7",
-  "description": "Slock channel plugin for Claude Code agent wake notifications.",
+  "name": "raft-channel",
+  "version": "0.2.0",
+  "description": "Raft channel plugin for Claude Code agent wake notifications.",
   "author": {
     "name": "Botiverse",
     "url": "https://github.com/botiverse"
   },
   "mcpServers": {
-    "slock": {
+    "raft": {
       "command": "node",
       "args": [
         "${CLAUDE_PLUGIN_ROOT}/dist/index.js"
       ],
       "env": {
-        "SLOCK_CLAUDE_CHANNEL_HOST": "127.0.0.1"
+        "RAFT_CHANNEL_HOST": "127.0.0.1"
       }
     }
   }

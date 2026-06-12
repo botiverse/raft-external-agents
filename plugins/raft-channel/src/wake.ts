@@ -2,7 +2,7 @@ import http from "node:http";
 import { randomUUID } from "node:crypto";
 
 export interface WakeRequest {
-  schema: "slock-claude-code-channel-wake.v1";
+  schema: "raft-channel-wake.v1";
   attemptId: string;
   eventId: string;
   messageId: string;
@@ -56,15 +56,15 @@ export async function startWakeServer(options: WakeServerOptions): Promise<Start
       writeJson(res, 404, {
         ok: false,
         failureClass: "no_session",
-        reason: "Unknown Slock Claude channel endpoint",
+        reason: "Unknown Raft Claude channel endpoint",
       });
       return;
     }
-    if (options.token && req.headers["x-slock-bridge-token"] !== options.token) {
+    if (options.token && req.headers["x-raft-bridge-token"] !== options.token) {
       writeJson(res, 401, {
         ok: false,
         failureClass: "auth_revoked",
-        reason: "Invalid Slock bridge token",
+        reason: "Invalid Raft bridge token",
       });
       return;
     }
@@ -183,8 +183,9 @@ export function channelBatchContent(requests: readonly WakeRequest[]): string {
   const first = requests[0];
   const messageIds = requests.slice(0, 5).map((request) => request.messageId);
   const lines = [
-    count > 1 ? `Slock wake hints received. pending_count=${count}` : "Slock wake hint received.",
-    "If you have not read the Slock manual in this Claude Code session, run `slock manual get slock-cli-overview` before using Slock commands.",
+    count > 1 ? `Raft wake hints received. pending_count=${count}` : "Raft wake hint received.",
+    "If you have not read the Raft manual in this Claude Code session, run `raft manual get slock-cli-overview` before using Raft commands.",
+    "Run `raft profile show` if you need to confirm which agent profile is active; profile output is identity context, not the source of channel/thread permissions or reply targets.",
   ];
   if (count > 1) {
     lines.push(`message_ids=${messageIds.join(",")}`);
@@ -195,7 +196,7 @@ export function channelBatchContent(requests: readonly WakeRequest[]): string {
     lines.push(`message_id=${first.messageId}`);
     lines.push(`attempt_id=${first.attemptId}`);
   }
-  lines.push("Run `slock message check` to pull the pending message.");
+  lines.push("Run `raft message check` to pull the pending message.");
   return lines.join("\n");
 }
 
@@ -208,17 +209,17 @@ export function channelBatchMeta(requests: readonly WakeRequest[]): Record<strin
   const messageIds = requests.slice(0, 8).map((request) => request.messageId);
   return [
     {
-      slock_message_id: first.messageId,
-      slock_attempt_id: first.attemptId,
-      slock_event_id: first.eventId,
-      slock_agent_id: first.agentId,
-      slock_profile: first.profile,
-      slock_core_session_id: first.coreSessionId,
-      slock_adapter_instance: first.adapterInstance,
+      raft_message_id: first.messageId,
+      raft_attempt_id: first.attemptId,
+      raft_event_id: first.eventId,
+      raft_agent_id: first.agentId,
+      raft_profile: first.profile,
+      raft_core_session_id: first.coreSessionId,
+      raft_adapter_instance: first.adapterInstance,
     },
     requests.length > 1 ? {
-      slock_wake_batch_size: String(requests.length),
-      slock_message_ids: messageIds.join(","),
+      raft_wake_batch_size: String(requests.length),
+      raft_message_ids: messageIds.join(","),
     } : {},
   ].reduce<Record<string, string>>((acc, item) => Object.assign(acc, item), {});
 }
@@ -243,7 +244,7 @@ function validateWakeRequest(value: unknown): WakeRequest {
     }
     assertSafeMetadataScalar(candidate[key], key);
   }
-  if (candidate.schema !== "slock-claude-code-channel-wake.v1") {
+  if (candidate.schema !== "raft-channel-wake.v1") {
     throw new Error("unsupported wake request schema");
   }
   return candidate as unknown as WakeRequest;

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 test("plugin shuts down bridge child when MCP stdin ends", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "slock-channel-eof-"));
+    const dir = await mkdtemp(join(tmpdir(), "raft-channel-eof-"));
     const bridgeCommand = join(dir, "fake-bridge.mjs");
     const startedFile = join(dir, "bridge-started");
     const terminatedFile = join(dir, "bridge-terminated");
@@ -29,8 +29,8 @@ test("plugin shuts down bridge child when MCP stdin ends", async () => {
             env: {
                 ...process.env,
                 SLOCK_PROFILE: "agent-profile",
-                SLOCK_CLAUDE_CHANNEL_BRIDGE_COMMAND: bridgeCommand,
-                SLOCK_CLAUDE_CHANNEL_PORT: "0",
+                RAFT_CHANNEL_BRIDGE_COMMAND: bridgeCommand,
+                RAFT_CHANNEL_PORT: "0",
                 BRIDGE_STARTED_FILE: startedFile,
                 BRIDGE_TERMINATED_FILE: terminatedFile,
             },

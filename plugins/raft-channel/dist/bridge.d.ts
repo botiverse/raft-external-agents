@@ -33,7 +33,7 @@ export declare function readBridgeConfig(env: NodeJS.ProcessEnv, endpoint: strin
  * shell + args-array triggers DEP0190 (args concatenated unescaped), so on
  * win32 we build ONE fully-quoted command string instead: every token is
  * double-quoted with embedded quotes escaped, which also survives
- * SLOCK_CLAUDE_CHANNEL_BRIDGE_COMMAND paths containing spaces
+ * RAFT_CHANNEL_BRIDGE_COMMAND paths containing spaces
  * (`C:\Program Files\...`). All tokens are internally constructed.
  */
 export declare function bridgeSpawnPlan(platform: NodeJS.Platform, command: string, args: string[]): {

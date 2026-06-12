@@ -23,4 +23,4 @@ await build({
   },
   allowOverwrite: true,
 });
-console.log("bundled plugins/slock-channel/dist/index.js (self-contained)");
+console.log("bundled plugins/raft-channel/dist/index.js (self-contained)");

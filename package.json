@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @botiverse/slock-claude-channel build",
-    "test": "pnpm --filter @botiverse/slock-claude-channel test",
-    "typecheck": "pnpm --filter @botiverse/slock-claude-channel typecheck"
+    "build": "pnpm --filter @botiverse/raft-channel build",
+    "test": "pnpm --filter @botiverse/raft-channel test",
+    "typecheck": "pnpm --filter @botiverse/raft-channel typecheck"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

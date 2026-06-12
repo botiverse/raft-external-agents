@@ -1,5 +1,5 @@
 export interface WakeRequest {
-    schema: "slock-claude-code-channel-wake.v1";
+    schema: "raft-channel-wake.v1";
     attemptId: string;
     eventId: string;
     messageId: string;
