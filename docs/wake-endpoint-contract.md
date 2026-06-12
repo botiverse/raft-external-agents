@@ -116,3 +116,46 @@ this transport must demonstrate locally:
 3. injection layer touches no Slock cursor state (structurally: the
    component never sees cursors — keep it that way);
 4. burst of N POSTs ⇒ < N injections (EAB-8), merged notice covers all N.
+
+## Activity Reporting (raft-activity.v1)
+
+Companion surface added with plugin 0.3.0 / slock #2886 (#wg-external-agent
+tasks #110/#111). The plugin's hook-fed local queue exposes:
+
+- `POST /activity` — the plugin-shipped Claude Code hook posts one
+  `raft-activity.v1` event (same `x-raft-bridge-token` auth as `/wake`).
+  Unknown fields are REJECTED, not stripped; `transcript_path` never
+  appears at any layer.
+- `GET /activity/drain?max=N` — the bridge drains up to N oldest events:
+  `{ "schema": "raft-activity-drain.v1", "events": [...], "dropped": <count> }`.
+  `dropped` is the number of events discarded to the queue cap since the
+  last drain (no silent truncation).
+
+**Delivery semantics — deliberately at-most-once.** This is the explicit
+inverse of the wake contract and the contrast is intentional:
+
+| | wake | activity |
+|---|---|---|
+| nature | behavioral signal (agent must act) | observational telemetry (humans watch) |
+| guarantee | at-least-once-until-consumed (EAB-7) | at-most-once, loss-tolerant |
+| on failure | hint survives, reconciliation retries | batch is gone |
+
+Concretely: drain removes events from the plugin queue immediately; if the
+bridge's forward to the server then fails, that batch is lost (observable
+only as `outcome: "failed"` in the bridge's `agent_comms.activity_drain`
+telemetry — counts only, no event ids, since bridge logs stay content-free).
+The queue cap (default 500, `RAFT_CHANNEL_ACTIVITY_QUEUE_CAP`) drops oldest
+on overflow. Do NOT add ack/replay to this path without revisiting the
+contract: activity must never compete with wake delivery for reliability
+machinery or block tool execution (hooks are async fire-and-forget and
+always exit 0).
+
+Content: tool events carry `toolName` plus `toolInput`/`toolOutput` capped
+at 4096 chars with an explicit truncation flag (managed-parity content per
+the 2026-06-12 ruling — the discipline is uniform truncation with markers,
+not blanking). Plugin 0.3.0 emits an event-level `truncated` boolean;
+consumers must accept it as a fallback for the per-field
+`toolInputTruncated`/`toolOutputTruncated` flags (over-marking both fields
+is the safe direction). Model thinking/assistant text is not reported in
+v0 — a mechanism-cost boundary (hook payloads carry no model output), not
+a parity one.
