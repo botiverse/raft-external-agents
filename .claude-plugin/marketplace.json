@@ -1,5 +1,5 @@
 {
-  "name": "slock",
+  "name": "raft",
   "description": "Raft external agent runtime plugins and marketplace catalog for Raft wake notifications.",
   "owner": {
     "name": "Botiverse",

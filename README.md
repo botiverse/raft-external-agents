@@ -9,7 +9,7 @@ Slock does not start, stop, or supervise Claude Code. The operator runs Claude C
 In the normal path, the plugin starts and supervises the local bridge-core child process for the current Claude Code session:
 
 ```bash
-SLOCK_PROFILE=<slug> claude --channels plugin:raft-channel@slock
+SLOCK_PROFILE=<slug> claude --channels plugin:raft-channel@raft
 ```
 
 The plugin only carries explicit runtime configuration such as the profile slug, loopback endpoint, and per-session wake token. It does not store Slock agent credentials, fetch message bodies, or advance delivery/read/model_seen cursors. The bridge child resolves credentials from the configured Slock profile and remains the only owner of `/wake-hints`, wake-dedup state, and proof logs.
@@ -24,19 +24,19 @@ Development/local path:
 pnpm install
 pnpm build
 claude plugin marketplace add --scope local /path/to/raft-external-agents
-claude plugin install --scope local raft-channel@slock
-SLOCK_PROFILE=<slug> claude --dangerously-load-development-channels plugin:raft-channel@slock
+claude plugin install --scope local raft-channel@raft
+SLOCK_PROFILE=<slug> claude --dangerously-load-development-channels plugin:raft-channel@raft
 ```
 
 Marketplace/org path:
 
 1. Add this marketplace source to Claude Code using the org-approved marketplace mechanism.
-2. Install the plugin with `/plugin install raft-channel@slock`.
+2. Install the plugin with `/plugin install raft-channel@raft`.
 3. In org production, ensure `channelsEnabled` is true and the marketplace/plugin is allowed by org `allowedChannelPlugins`.
 4. Start Claude Code with the installed channel:
 
 ```bash
-SLOCK_PROFILE=<slug> claude --channels plugin:raft-channel@slock
+SLOCK_PROFILE=<slug> claude --channels plugin:raft-channel@raft
 ```
 
 ## Local IPC
@@ -64,7 +64,7 @@ Set attach mode when you want to run the bridge manually for debugging, headless
 SLOCK_PROFILE=<slug> \
 RAFT_CHANNEL_BRIDGE_MODE=attach \
 RAFT_CHANNEL_TOKEN=<manual-shared-token> \
-claude --channels plugin:raft-channel@slock
+claude --channels plugin:raft-channel@raft
 
 RAFT_CHANNEL_TOKEN=<manual-shared-token> \
 slock agent bridge --json \
