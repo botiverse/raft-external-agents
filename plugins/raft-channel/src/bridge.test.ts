@@ -8,6 +8,7 @@ test("bridge args do not expose the wake token", () => {
     mode: "spawn" as const,
     command: "slock",
     profile: "agent-profile",
+    profileConflict: false,
     endpoint: "http://127.0.0.1:49152/wake",
     token: "session-secret",
     explicitToken: false,
@@ -33,12 +34,51 @@ test("bridge args do not expose the wake token", () => {
   ]);
 });
 
-test("spawn mode requires explicit SLOCK_PROFILE provenance", () => {
+test("spawn mode requires explicit profile provenance", () => {
   const config = readBridgeConfig({}, "http://127.0.0.1:49152/wake", "session-secret", false);
   const supervisor = new BridgeSupervisor(config);
 
   assert.equal(supervisor.start().state, "missing_profile");
+  assert.match(supervisor.getStatus().reason ?? "", /RAFT_PROFILE/);
   assert.match(supervisor.getStatus().reason ?? "", /SLOCK_PROFILE/);
+});
+
+// CLI rename (slock #2870/#2872): RAFT_PROFILE is canonical, SLOCK_PROFILE a
+// deprecation alias; mirror the CLI's both-set-and-different → error rule.
+test("RAFT_PROFILE is read and wins resolution", () => {
+  const config = readBridgeConfig({ RAFT_PROFILE: "raft-prof" }, "http://127.0.0.1:49152/wake", "t", false);
+  assert.equal(config.profile, "raft-prof");
+  assert.equal(config.profileConflict, false);
+});
+
+test("legacy SLOCK_PROFILE alias still resolves", () => {
+  const config = readBridgeConfig({ SLOCK_PROFILE: "legacy-prof" }, "http://127.0.0.1:49152/wake", "t", false);
+  assert.equal(config.profile, "legacy-prof");
+});
+
+test("equal RAFT_PROFILE and SLOCK_PROFILE are not a conflict", () => {
+  const config = readBridgeConfig(
+    { RAFT_PROFILE: "same", SLOCK_PROFILE: "same" },
+    "http://127.0.0.1:49152/wake",
+    "t",
+    false,
+  );
+  assert.equal(config.profile, "same");
+  assert.equal(config.profileConflict, false);
+});
+
+test("conflicting profile envs fail closed instead of silently picking one", () => {
+  const config = readBridgeConfig(
+    { RAFT_PROFILE: "one", SLOCK_PROFILE: "other" },
+    "http://127.0.0.1:49152/wake",
+    "t",
+    false,
+  );
+  assert.equal(config.profile, undefined);
+  assert.equal(config.profileConflict, true);
+  const supervisor = new BridgeSupervisor(config);
+  assert.equal(supervisor.start().state, "missing_profile");
+  assert.match(supervisor.getStatus().reason ?? "", /different values/);
 });
 
 test("attach mode requires operator-provided token", () => {

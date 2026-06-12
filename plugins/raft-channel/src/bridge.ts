@@ -18,6 +18,8 @@ export interface BridgeConfig {
   mode: BridgeMode;
   command: string;
   profile?: string;
+  /** RAFT_PROFILE and SLOCK_PROFILE both set with different values. */
+  profileConflict: boolean;
   endpoint: string;
   token: string;
   explicitToken: boolean;
@@ -42,10 +44,17 @@ export interface BridgeStatus {
 
 export function readBridgeConfig(env: NodeJS.ProcessEnv, endpoint: string, token: string, explicitToken: boolean): BridgeConfig {
   const mode = env.RAFT_CHANNEL_BRIDGE_MODE === "attach" ? "attach" : "spawn";
+  // CLI rename (slock #2870/#2872): RAFT_PROFILE is the canonical env;
+  // SLOCK_PROFILE stays as a deprecation alias. Mirror the CLI's conflict
+  // rule — both set with different values is an error, never a silent pick.
+  const raftProfile = env.RAFT_PROFILE?.trim() || undefined;
+  const slockProfile = env.SLOCK_PROFILE?.trim() || undefined;
+  const profileConflict = raftProfile !== undefined && slockProfile !== undefined && raftProfile !== slockProfile;
   return {
     mode,
     command: env.RAFT_CHANNEL_BRIDGE_COMMAND || "slock",
-    profile: env.SLOCK_PROFILE?.trim() || undefined,
+    profile: profileConflict ? undefined : raftProfile ?? slockProfile,
+    profileConflict,
     endpoint,
     token,
     explicitToken,
@@ -145,8 +154,13 @@ export class BridgeSupervisor {
       startedAt: new Date().toISOString(),
     };
 
+    // Inject BOTH profile env names with the same value: a paired CLI
+    // (slock #2870+) reads RAFT_PROFILE, an older CLI reads SLOCK_PROFILE,
+    // and equal values never trip the CLI's conflict error — so 0.2.2 is a
+    // soft transition with no hard CLI version pairing.
     const env = {
       ...process.env,
+      RAFT_PROFILE: this.config.profile,
       SLOCK_PROFILE: this.config.profile,
       RAFT_CHANNEL_TOKEN: this.config.token,
     };
@@ -290,13 +304,22 @@ export class BridgeSupervisor {
         reason: "Plugin is in attach mode; start `slock agent bridge --json` separately.",
       };
     }
+    if (config.profileConflict) {
+      return {
+        mode: "spawn",
+        state: "missing_profile",
+        command: config.command,
+        endpoint: config.endpoint,
+        reason: "RAFT_PROFILE and SLOCK_PROFILE are both set with different values; unset one so the bridge never silently picks an identity.",
+      };
+    }
     if (!config.profile) {
       return {
         mode: "spawn",
         state: "missing_profile",
         command: config.command,
         endpoint: config.endpoint,
-        reason: "SLOCK_PROFILE is required so the plugin can spawn bridge-core with an explicit profile.",
+        reason: "RAFT_PROFILE (or the legacy SLOCK_PROFILE alias) is required so the plugin can spawn bridge-core with an explicit profile.",
       };
     }
     return {
