@@ -155,3 +155,81 @@ test("wake server rejects unsafe metadata before notification", async () => {
         await server.close();
     }
 });
+test("activity endpoint accepts valid events, rejects bad tokens and smuggled fields, and drains", async () => {
+    const { ActivityQueue, buildActivityEvent } = await import("./activity.js");
+    const queue = new ActivityQueue(10);
+    const server = await startWakeServer({
+        host: "127.0.0.1",
+        port: 0,
+        token: "secret",
+        activityQueue: queue,
+        notifier: { async notify() { } },
+    });
+    const activityUrl = server.url.replace(/\/wake$/, "/activity");
+    try {
+        const event = buildActivityEvent({
+            session_id: "sess-1",
+            hook_event_name: "PostToolUse",
+            tool_name: "Bash",
+            tool_input: { command: "ls" },
+            tool_output: "ok",
+        });
+        assert.ok(event);
+        const unauthorized = await fetch(activityUrl, {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-raft-bridge-token": "wrong" },
+            body: JSON.stringify(event),
+        });
+        assert.equal(unauthorized.status, 401);
+        assert.equal(queue.size, 0);
+        const smuggled = await fetch(activityUrl, {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-raft-bridge-token": "secret" },
+            body: JSON.stringify({ ...event, transcript_path: "/leak" }),
+        });
+        assert.equal(smuggled.status, 400);
+        assert.equal(queue.size, 0);
+        const accepted = await fetch(activityUrl, {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-raft-bridge-token": "secret" },
+            body: JSON.stringify(event),
+        });
+        assert.equal(accepted.status, 202);
+        assert.equal(queue.size, 1);
+        const drainUnauthorized = await fetch(`${activityUrl}/drain`, {
+            headers: { "x-raft-bridge-token": "wrong" },
+        });
+        assert.equal(drainUnauthorized.status, 401);
+        const drained = await fetch(`${activityUrl}/drain?max=10`, {
+            headers: { "x-raft-bridge-token": "secret" },
+        });
+        assert.equal(drained.status, 200);
+        const body = await drained.json();
+        assert.equal(body.schema, "raft-activity-drain.v1");
+        assert.equal(body.events.length, 1);
+        assert.equal(body.dropped, 0);
+        assert.equal(queue.size, 0);
+    }
+    finally {
+        await server.close();
+    }
+});
+test("activity routes 404 when no queue is configured", async () => {
+    const server = await startWakeServer({
+        host: "127.0.0.1",
+        port: 0,
+        token: "secret",
+        notifier: { async notify() { } },
+    });
+    try {
+        const res = await fetch(server.url.replace(/\/wake$/, "/activity"), {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-raft-bridge-token": "secret" },
+            body: "{}",
+        });
+        assert.equal(res.status, 404);
+    }
+    finally {
+        await server.close();
+    }
+});

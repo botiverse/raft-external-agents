@@ -1,6 +1,6 @@
 {
   "name": "@botiverse/raft-channel",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Claude Code channel plugin for Raft wake injection.",
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && node bundle.mjs",
-    "test": "node --test dist/bridge.test.js dist/index.test.js dist/wake.test.js",
+    "test": "node --test dist/activity.test.js dist/bridge.test.js dist/index.test.js dist/wake.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

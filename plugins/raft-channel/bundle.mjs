@@ -24,3 +24,16 @@ await build({
   allowOverwrite: true,
 });
 console.log("bundled plugins/raft-channel/dist/index.js (self-contained)");
+
+// The activity hook runs as a standalone `node dist/activity-hook.js` from
+// hooks.json — same zero-node_modules marketplace constraint as the entry.
+await build({
+  entryPoints: [path.join(root, "src/activity-hook.ts")],
+  outfile: path.join(root, "dist/activity-hook.js"),
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node18",
+  allowOverwrite: true,
+});
+console.log("bundled plugins/raft-channel/dist/activity-hook.js (self-contained)");

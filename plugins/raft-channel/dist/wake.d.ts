@@ -1,3 +1,4 @@
+import { type ActivityQueue } from "./activity.js";
 export interface WakeRequest {
     schema: "raft-channel-wake.v1";
     attemptId: string;
@@ -33,6 +34,8 @@ export interface WakeServerOptions {
     token?: string;
     runtimeSession?: string;
     notifier: ChannelNotifier;
+    /** When present, exposes POST /activity + GET /activity/drain (task #110). */
+    activityQueue?: ActivityQueue;
 }
 export interface StartedWakeServer {
     url: string;
