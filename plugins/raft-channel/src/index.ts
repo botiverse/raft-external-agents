@@ -31,7 +31,7 @@ const token = process.env.RAFT_CHANNEL_TOKEN || randomBytes(32).toString("base64
 const server = new Server(
   {
     name: "raft",
-    version: "0.3.0",
+    version: "0.3.1",
   },
   {
     capabilities: {

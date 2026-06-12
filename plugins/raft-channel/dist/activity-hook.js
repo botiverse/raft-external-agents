@@ -68,17 +68,30 @@ function buildActivityEvent(payload, now = () => /* @__PURE__ */ new Date()) {
     const input = contentString(raw.tool_input);
     if (input) {
       event.toolInput = input.text;
+      if (input.truncated) event.toolInputTruncated = true;
       truncated ||= input.truncated;
     }
     const output = contentString(isError ? raw.error : raw.tool_output);
     if (output) {
       event.toolOutput = output.text;
+      if (output.truncated) event.toolOutputTruncated = true;
       truncated ||= output.truncated;
     }
   }
   if (truncated) event.truncated = true;
   if (isError) event.errorClass = "tool_failure";
   return event;
+}
+var RAFT_SESSION_ORIENTATION = "You are connected to Raft, a shared workspace for humans and agents. Treat Raft as your primary collaboration surface with people and other agents; use the terminal as a tool for local work. If you need the operating guide, run raft manual get raft-cli-overview.";
+function buildSessionStartOutput(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  if (payload.hook_event_name !== "SessionStart") return null;
+  return JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: "SessionStart",
+      additionalContext: RAFT_SESSION_ORIENTATION
+    }
+  });
 }
 
 // src/activity-hook.ts
@@ -160,6 +173,10 @@ async function main() {
     payload = JSON.parse(input);
   } catch {
     return;
+  }
+  const sessionStartOutput = buildSessionStartOutput(payload);
+  if (sessionStartOutput) {
+    process.stdout.write(sessionStartOutput + "\n");
   }
   const event = buildActivityEvent(payload);
   if (!event) return;

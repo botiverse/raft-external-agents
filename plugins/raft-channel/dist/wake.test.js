@@ -20,7 +20,7 @@ const secondRequest = {
 };
 test("channel payload is content-free and maps citation metadata to underscore keys", () => {
     assert.match(channelContent(request), /raft message check/);
-    assert.match(channelContent(request), /raft manual get slock-cli-overview/);
+    assert.match(channelContent(request), /raft manual get raft-cli-overview/);
     assert.match(channelContent(request), /raft profile show/);
     assert.match(channelContent(request), /identity context/);
     assert.match(channelContent(request), /not read the Raft manual in this Claude Code session/);

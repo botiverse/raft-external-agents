@@ -1,5 +1,5 @@
 {
-  "description": "Raft content-free activity reporting: tool/turn/session lifecycle events are queued at the plugin's local tokenized endpoint and drained by the Raft bridge. No tool inputs, outputs, prompts, or transcript content are read or transmitted. Hooks are async fire-and-forget and always exit 0, so reporting can never block or perturb tool execution.",
+  "description": "Raft activity reporting with managed parity: tool events carry tool name plus capped tool input/output (uniform 4096-char truncation with explicit markers), turn/session lifecycle events carry lifecycle facts only. transcript_path, prompts, and model thinking are never read or transmitted. Tool/turn hooks are async fire-and-forget and always exit 0, so reporting can never block or perturb tool execution. SessionStart additionally runs synchronously to inject the Raft orientation context (same wording as the setup card's --append-system-prompt).",
   "hooks": {
     "PreToolUse": [
       {
@@ -76,8 +76,7 @@
             "type": "command",
             "command": "node",
             "args": ["${CLAUDE_PLUGIN_ROOT}/dist/activity-hook.js"],
-            "async": true,
-            "timeout": 15
+            "timeout": 10
           }
         ]
       }

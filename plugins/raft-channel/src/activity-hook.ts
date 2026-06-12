@@ -18,7 +18,7 @@ import http from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { buildActivityEvent } from "./activity.js";
+import { buildActivityEvent, buildSessionStartOutput } from "./activity.js";
 
 const POST_TIMEOUT_MS = 2500;
 const STDIN_TIMEOUT_MS = 3000;
@@ -109,6 +109,10 @@ async function main(): Promise<void> {
     payload = JSON.parse(input);
   } catch {
     return;
+  }
+  const sessionStartOutput = buildSessionStartOutput(payload);
+  if (sessionStartOutput) {
+    process.stdout.write(sessionStartOutput + "\n");
   }
   const event = buildActivityEvent(payload);
   if (!event) return;

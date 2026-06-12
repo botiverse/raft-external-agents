@@ -67,8 +67,10 @@ only. `transcript_path` is never read or transmitted, and model thinking/text
 is not reported in v0 (mechanism cost, not a parity boundary — it needs
 transcript/MessageDisplay integration).
 
-Hooks are `async` fire-and-forget and always exit 0, so reporting can never
-block or perturb tool execution. Events flow: hook script → tokenized local
+Tool/turn hooks are `async` fire-and-forget and always exit 0, so reporting can
+never block tool execution; SessionStart runs synchronously to inject the Raft
+orientation context (same wording as the setup card) and still always exits 0.
+Events flow: hook script → tokenized local
 `POST /activity` (endpoint discovered via a file the plugin writes, keyed by
 the shared Claude Code parent pid) → bounded in-memory queue (cap
 `RAFT_CHANNEL_ACTIVITY_QUEUE_CAP`, default 500, oldest dropped with a

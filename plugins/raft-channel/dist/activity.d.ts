@@ -16,7 +16,10 @@ export interface ActivityEvent {
     toolInput?: string;
     /** Stringified tool output/error, capped. */
     toolOutput?: string;
-    /** Set when any content field hit CONTENT_CAP. */
+    /** Per-field truncation flags (0.3.1+; consumers prefer these). */
+    toolInputTruncated?: boolean;
+    toolOutputTruncated?: boolean;
+    /** Event-level flag kept for 0.3.0 consumers (set when any field was cut). */
     truncated?: boolean;
     errorClass?: string;
 }
@@ -28,6 +31,8 @@ export interface ActivityEvent {
  * error. NEVER reads transcript_path (full session content) or prompt.
  */
 export declare function buildActivityEvent(payload: unknown, now?: () => Date): ActivityEvent | null;
+export declare const RAFT_SESSION_ORIENTATION: string;
+export declare function buildSessionStartOutput(payload: unknown): string | null;
 export interface DrainResult {
     schema: typeof ACTIVITY_DRAIN_SCHEMA;
     events: ActivityEvent[];
