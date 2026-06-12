@@ -18,8 +18,8 @@ test("bridge args do not expose the wake token", () => {
     "bridge",
     "--json",
     "--wake-adapter",
-    "claude-code-channels",
-    "--claude-channel-endpoint",
+    "raft-channel",
+    "--raft-channel-endpoint",
     "http://127.0.0.1:49152/wake",
   ]);
   assert.deepEqual(buildBridgeStatusArgs(config), [
@@ -27,8 +27,8 @@ test("bridge args do not expose the wake token", () => {
     "bridge",
     "--json",
     "--wake-adapter",
-    "claude-code-channels",
-    "--claude-channel-endpoint",
+    "raft-channel",
+    "--raft-channel-endpoint",
     "http://127.0.0.1:49152/wake",
   ]);
 });
@@ -43,18 +43,18 @@ test("spawn mode requires explicit SLOCK_PROFILE provenance", () => {
 
 test("attach mode requires operator-provided token", () => {
   const config = readBridgeConfig({
-    SLOCK_CLAUDE_CHANNEL_BRIDGE_MODE: "attach",
+    RAFT_CHANNEL_BRIDGE_MODE: "attach",
     SLOCK_PROFILE: "agent-profile",
   }, "http://127.0.0.1:49152/wake", "generated-secret", false);
   const supervisor = new BridgeSupervisor(config);
 
   assert.equal(supervisor.start().state, "missing_token");
-  assert.match(supervisor.getStatus().reason ?? "", /SLOCK_CLAUDE_CHANNEL_TOKEN/);
+  assert.match(supervisor.getStatus().reason ?? "", /RAFT_CHANNEL_TOKEN/);
 });
 
 test("attach mode can report manual bridge path when token was explicit", () => {
   const config = readBridgeConfig({
-    SLOCK_CLAUDE_CHANNEL_BRIDGE_MODE: "attach",
+    RAFT_CHANNEL_BRIDGE_MODE: "attach",
     SLOCK_PROFILE: "agent-profile",
   }, "http://127.0.0.1:49152/wake", "operator-secret", true);
   const supervisor = new BridgeSupervisor(config);
@@ -70,7 +70,7 @@ test("attach mode can report manual bridge path when token was explicit", () => 
 // must not respawn.
 test("supervisor respawns an unexpectedly exited bridge child with backoff", async () => {
   const config = readBridgeConfig(
-    { SLOCK_PROFILE: "profile-restart", SLOCK_CLAUDE_CHANNEL_BRIDGE_COMMAND: process.execPath },
+    { SLOCK_PROFILE: "profile-restart", RAFT_CHANNEL_BRIDGE_COMMAND: process.execPath },
     "http://127.0.0.1:0/wake",
     "token-restart",
     true,
@@ -114,11 +114,11 @@ test("bridge child spawn plan: quoted shell string on win32, direct argv elsewhe
   const direct = bridgeSpawnPlan("linux", "slock", ["agent", "bridge", "--json"]);
   assert.deepEqual(direct, { command: "slock", args: ["agent", "bridge", "--json"], options: { shell: false } });
 
-  const win = bridgeSpawnPlan("win32", "C:\\Program Files\\slock\\slock.cmd", ["agent", "bridge", "--wake-endpoint", "http://127.0.0.1:8646/wake"]);
+  const win = bridgeSpawnPlan("win32", "C:\\Program Files\\slock\\slock.cmd", ["agent", "bridge", "--raft-channel-endpoint", "http://127.0.0.1:8646/wake"]);
   assert.equal(win.options.shell, true);
   assert.deepEqual(win.args, [], "win32 must pass a single string, not an args array (DEP0190)");
   assert.equal(
     win.command,
-    '"C:\\Program Files\\slock\\slock.cmd" "agent" "bridge" "--wake-endpoint" "http://127.0.0.1:8646/wake"',
+    '"C:\\Program Files\\slock\\slock.cmd" "agent" "bridge" "--raft-channel-endpoint" "http://127.0.0.1:8646/wake"',
   );
 });

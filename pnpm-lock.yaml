@@ -15,7 +15,7 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  plugins/slock-channel:
+  plugins/raft-channel:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.22.0

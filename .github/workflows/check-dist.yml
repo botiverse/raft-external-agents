@@ -24,14 +24,14 @@ jobs:
       - run: pnpm test
       - name: dist must match src (rebuild and diff)
         run: |
-          if ! git diff --exit-code plugins/slock-channel/dist; then
-            echo "::error::plugins/slock-channel/dist is out of date. Run 'pnpm build' and commit the result."
+          if ! git diff --exit-code plugins/raft-channel/dist; then
+            echo "::error::plugins/raft-channel/dist is out of date. Run 'pnpm build' and commit the result."
             exit 1
           fi
       - name: bundled entry must run without node_modules
         run: |
           tmp="$(mktemp -d)"
-          cp plugins/slock-channel/dist/index.js "$tmp/"
+          cp plugins/raft-channel/dist/index.js "$tmp/"
           cd "$tmp"
-          SLOCK_CLAUDE_CHANNEL_PORT=0 SLOCK_CLAUDE_CHANNEL_BRIDGE_MODE=attach SLOCK_CLAUDE_CHANNEL_TOKEN=ci timeout 5 node index.js < /dev/null 2>&1 | tee out.log || true
+          RAFT_CHANNEL_PORT=0 RAFT_CHANNEL_BRIDGE_MODE=attach RAFT_CHANNEL_TOKEN=ci timeout 5 node index.js < /dev/null 2>&1 | tee out.log || true
           grep -q "wake endpoint listening" out.log

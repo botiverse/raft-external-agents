@@ -1,10 +1,10 @@
 import { spawn } from "node:child_process";
 import readline from "node:readline";
 export function readBridgeConfig(env, endpoint, token, explicitToken) {
-    const mode = env.SLOCK_CLAUDE_CHANNEL_BRIDGE_MODE === "attach" ? "attach" : "spawn";
+    const mode = env.RAFT_CHANNEL_BRIDGE_MODE === "attach" ? "attach" : "spawn";
     return {
         mode,
-        command: env.SLOCK_CLAUDE_CHANNEL_BRIDGE_COMMAND || "slock",
+        command: env.RAFT_CHANNEL_BRIDGE_COMMAND || "slock",
         profile: env.SLOCK_PROFILE?.trim() || undefined,
         endpoint,
         token,
@@ -19,7 +19,7 @@ export function readBridgeConfig(env, endpoint, token, explicitToken) {
  * shell + args-array triggers DEP0190 (args concatenated unescaped), so on
  * win32 we build ONE fully-quoted command string instead: every token is
  * double-quoted with embedded quotes escaped, which also survives
- * SLOCK_CLAUDE_CHANNEL_BRIDGE_COMMAND paths containing spaces
+ * RAFT_CHANNEL_BRIDGE_COMMAND paths containing spaces
  * (`C:\Program Files\...`). All tokens are internally constructed.
  */
 export function bridgeSpawnPlan(platform, command, args) {
@@ -39,8 +39,8 @@ export function buildBridgeArgs(config) {
         "bridge",
         "--json",
         "--wake-adapter",
-        "claude-code-channels",
-        "--claude-channel-endpoint",
+        "raft-channel",
+        "--raft-channel-endpoint",
         config.endpoint,
     ];
 }
@@ -89,7 +89,7 @@ export class BridgeSupervisor {
         const env = {
             ...process.env,
             SLOCK_PROFILE: this.config.profile,
-            SLOCK_CLAUDE_CHANNEL_TOKEN: this.config.token,
+            RAFT_CHANNEL_TOKEN: this.config.token,
         };
         const plan = bridgeSpawnPlan(process.platform, this.config.command, args);
         const child = spawn(plan.command, plan.args, {
@@ -106,7 +106,7 @@ export class BridgeSupervisor {
                 pid: child.pid,
                 ...(this.restartCount > 0 ? { restartCount: this.restartCount } : {}),
             };
-            console.error(`Slock bridge child started pid=${child.pid} profile=${this.config.profile}`);
+            console.error(`Raft bridge child started pid=${child.pid} profile=${this.config.profile}`);
         });
         child.once("error", (err) => {
             this.status = {
@@ -116,7 +116,7 @@ export class BridgeSupervisor {
                 exitedAt: new Date().toISOString(),
             };
             this.child = undefined;
-            console.error(`Slock bridge child failed to start: ${err.message}`);
+            console.error(`Raft bridge child failed to start: ${err.message}`);
         });
         child.once("exit", (exitCode, signal) => {
             const deliberatelyStopped = this.status.state === "stopped";
@@ -128,7 +128,7 @@ export class BridgeSupervisor {
                 exitedAt: new Date().toISOString(),
             };
             this.child = undefined;
-            console.error(`Slock bridge child exited code=${exitCode ?? "null"} signal=${signal ?? "null"}`);
+            console.error(`Raft bridge child exited code=${exitCode ?? "null"} signal=${signal ?? "null"}`);
             // task #87 finding 3: spawn-once left the CC session wake-dead for its
             // entire remainder after any bridge crash/fatal exit (live-confirmed:
             // kill child -> pending messages never wake again). Respawn with
@@ -139,9 +139,9 @@ export class BridgeSupervisor {
             }
         });
         if (child.stdout)
-            pipeLines(child.stdout, "slock bridge stdout");
+            pipeLines(child.stdout, "raft bridge stdout");
         if (child.stderr)
-            pipeLines(child.stderr, "slock bridge stderr");
+            pipeLines(child.stderr, "raft bridge stderr");
         return this.status;
     }
     scheduleRestart() {
@@ -162,7 +162,7 @@ export class BridgeSupervisor {
             restartCount: this.restartCount,
             nextRestartDelayMs: delayMs,
         };
-        console.error(`Slock bridge child restart #${this.restartCount} scheduled in ${delayMs}ms`);
+        console.error(`Raft bridge child restart #${this.restartCount} scheduled in ${delayMs}ms`);
         this.restartTimer = setTimeout(() => {
             this.restartTimer = undefined;
             if (this.status.state === "stopped")
@@ -213,7 +213,7 @@ export class BridgeSupervisor {
                     mode: "attach",
                     state: "missing_token",
                     endpoint: config.endpoint,
-                    reason: "Attach mode requires SLOCK_CLAUDE_CHANNEL_TOKEN so unauthenticated localhost wake POSTs stay rejected.",
+                    reason: "Attach mode requires RAFT_CHANNEL_TOKEN so unauthenticated localhost wake POSTs stay rejected.",
                 };
             }
             return {

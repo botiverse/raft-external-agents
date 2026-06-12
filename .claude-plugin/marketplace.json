@@ -1,15 +1,15 @@
 {
   "name": "slock",
-  "description": "Raft external agent runtime plugins and marketplace catalog for Slock wake notifications.",
+  "description": "Raft external agent runtime plugins and marketplace catalog for Raft wake notifications.",
   "owner": {
     "name": "Botiverse",
     "url": "https://github.com/botiverse"
   },
   "plugins": [
     {
-      "name": "slock-channel",
-      "description": "Slock wake channel for operator-managed Claude Code sessions.",
-      "source": "./plugins/slock-channel"
+      "name": "raft-channel",
+      "description": "Raft wake channel for operator-managed Claude Code sessions.",
+      "source": "./plugins/raft-channel"
     }
   ]
 }
