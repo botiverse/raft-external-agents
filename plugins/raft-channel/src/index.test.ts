@@ -82,3 +82,16 @@ function waitForExit(child: ChildProcess, timeoutMs: number): Promise<{ code: nu
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+test("SessionStart hook output injects the Raft orientation context", async () => {
+  const { buildSessionStartOutput, RAFT_SESSION_ORIENTATION } = await import("./activity.js");
+  const out = buildSessionStartOutput({ hook_event_name: "SessionStart", session_id: "s", source: "startup" });
+  assert.ok(out);
+  const parsed = JSON.parse(out) as { hookSpecificOutput?: { hookEventName?: string; additionalContext?: string } };
+  assert.equal(parsed.hookSpecificOutput?.hookEventName, "SessionStart");
+  assert.equal(parsed.hookSpecificOutput?.additionalContext, RAFT_SESSION_ORIENTATION);
+  assert.match(RAFT_SESSION_ORIENTATION, /primary collaboration surface/);
+  assert.match(RAFT_SESSION_ORIENTATION, /raft manual get raft-cli-overview/);
+  assert.equal(buildSessionStartOutput({ hook_event_name: "Stop" }), null);
+  assert.equal(buildSessionStartOutput(null), null);
+});

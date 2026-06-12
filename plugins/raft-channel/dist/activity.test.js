@@ -130,3 +130,16 @@ test("validation enforces schema and status closed set", () => {
     assert.throws(() => validateActivityEvent({ ...event, schema: "other.v1" }), /schema/);
     assert.throws(() => validateActivityEvent({ ...event, status: "weird" }), /status/);
 });
+test("per-field truncation flags mark only the field that was cut (0.3.1)", () => {
+    const event = buildActivityEvent({
+        ...BASE_PAYLOAD,
+        hook_event_name: "PostToolUse",
+        tool_name: "Write",
+        tool_input: "x".repeat(CONTENT_CAP * 2),
+        tool_output: "short",
+    });
+    assert.ok(event);
+    assert.equal(event.toolInputTruncated, true);
+    assert.equal(event.toolOutputTruncated, undefined);
+    assert.equal(event.truncated, true);
+});

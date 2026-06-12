@@ -15510,6 +15510,8 @@ function validateActivityEvent(value) {
     "toolName",
     "toolInput",
     "toolOutput",
+    "toolInputTruncated",
+    "toolOutputTruncated",
     "truncated",
     "errorClass"
   ]);
@@ -15522,7 +15524,9 @@ function validateActivityEvent(value) {
   if (raw.status !== "ok" && raw.status !== "error") throw new Error("activity event status must be ok|error");
   if (raw.toolName !== void 0 && !safeScalar(raw.toolName)) throw new Error("activity event toolName must be a safe string");
   if (raw.errorClass !== void 0 && !safeScalar(raw.errorClass)) throw new Error("activity event errorClass must be a safe string");
-  if (raw.truncated !== void 0 && typeof raw.truncated !== "boolean") throw new Error("activity event truncated must be a boolean");
+  for (const key of ["truncated", "toolInputTruncated", "toolOutputTruncated"]) {
+    if (raw[key] !== void 0 && typeof raw[key] !== "boolean") throw new Error(`activity event ${key} must be a boolean`);
+  }
   const event = raw;
   for (const key of ["toolInput", "toolOutput"]) {
     const content = raw[key];
@@ -15922,7 +15926,7 @@ function channelBatchContent(requests) {
   const messageIds = requests.slice(0, 5).map((request) => request.messageId);
   const lines = [
     count > 1 ? `Raft wake hints received. pending_count=${count}` : "Raft wake hint received.",
-    "If you have not read the Raft manual in this Claude Code session, run `raft manual get slock-cli-overview` before using Raft commands.",
+    "If you have not read the Raft manual in this Claude Code session, run `raft manual get raft-cli-overview` before using Raft commands.",
     "Run `raft profile show` if you need to confirm which agent profile is active; profile output is identity context, not the source of channel/thread permissions or reply targets."
   ];
   if (count > 1) {
@@ -16013,7 +16017,7 @@ var token = process.env.RAFT_CHANNEL_TOKEN || randomBytes(32).toString("base64ur
 var server = new Server(
   {
     name: "raft",
-    version: "0.3.0"
+    version: "0.3.1"
   },
   {
     capabilities: {

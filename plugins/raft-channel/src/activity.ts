@@ -45,7 +45,10 @@ export interface ActivityEvent {
   toolInput?: string;
   /** Stringified tool output/error, capped. */
   toolOutput?: string;
-  /** Set when any content field hit CONTENT_CAP. */
+  /** Per-field truncation flags (0.3.1+; consumers prefer these). */
+  toolInputTruncated?: boolean;
+  toolOutputTruncated?: boolean;
+  /** Event-level flag kept for 0.3.0 consumers (set when any field was cut). */
   truncated?: boolean;
   errorClass?: string;
 }
@@ -116,17 +119,42 @@ export function buildActivityEvent(
     const input = contentString(raw.tool_input);
     if (input) {
       event.toolInput = input.text;
+      if (input.truncated) event.toolInputTruncated = true;
       truncated ||= input.truncated;
     }
     const output = contentString(isError ? raw.error : raw.tool_output);
     if (output) {
       event.toolOutput = output.text;
+      if (output.truncated) event.toolOutputTruncated = true;
       truncated ||= output.truncated;
     }
   }
   if (truncated) event.truncated = true;
   if (isError) event.errorClass = "tool_failure";
   return event;
+}
+
+// Session orientation (task #116): SessionStart runs as a SYNC hook (the only
+// non-async entry in hooks.json) so Claude Code reads the hook's stdout JSON
+// and injects this context. Wording is the canonical text shared with the web
+// setup card's --append-system-prompt (slock #2891) — the hook makes it
+// zero-config for sessions launched without that flag, and re-injects after
+// resume/compaction.
+export const RAFT_SESSION_ORIENTATION =
+  "You are connected to Raft, a shared workspace for humans and agents. " +
+  "Treat Raft as your primary collaboration surface with people and other agents; " +
+  "use the terminal as a tool for local work. " +
+  "If you need the operating guide, run raft manual get raft-cli-overview.";
+
+export function buildSessionStartOutput(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  if ((payload as Record<string, unknown>).hook_event_name !== "SessionStart") return null;
+  return JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: "SessionStart",
+      additionalContext: RAFT_SESSION_ORIENTATION,
+    },
+  });
 }
 
 export interface DrainResult {
@@ -186,7 +214,8 @@ export function validateActivityEvent(value: unknown): ActivityEvent {
 
   const allowed = new Set([
     "schema", "eventId", "sessionId", "hookEventName", "status", "occurredAt",
-    "toolName", "toolInput", "toolOutput", "truncated", "errorClass",
+    "toolName", "toolInput", "toolOutput",
+    "toolInputTruncated", "toolOutputTruncated", "truncated", "errorClass",
   ]);
   for (const key of Object.keys(raw)) {
     if (!allowed.has(key)) throw new Error(`activity event field ${key} is not allowed`);
@@ -198,7 +227,9 @@ export function validateActivityEvent(value: unknown): ActivityEvent {
   if (raw.status !== "ok" && raw.status !== "error") throw new Error("activity event status must be ok|error");
   if (raw.toolName !== undefined && !safeScalar(raw.toolName)) throw new Error("activity event toolName must be a safe string");
   if (raw.errorClass !== undefined && !safeScalar(raw.errorClass)) throw new Error("activity event errorClass must be a safe string");
-  if (raw.truncated !== undefined && typeof raw.truncated !== "boolean") throw new Error("activity event truncated must be a boolean");
+  for (const key of ["truncated", "toolInputTruncated", "toolOutputTruncated"] as const) {
+    if (raw[key] !== undefined && typeof raw[key] !== "boolean") throw new Error(`activity event ${key} must be a boolean`);
+  }
 
   const event = raw as unknown as ActivityEvent;
   for (const key of ["toolInput", "toolOutput"] as const) {

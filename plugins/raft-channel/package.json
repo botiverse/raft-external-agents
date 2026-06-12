@@ -1,6 +1,6 @@
 {
   "name": "@botiverse/raft-channel",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "description": "Claude Code channel plugin for Raft wake injection.",
