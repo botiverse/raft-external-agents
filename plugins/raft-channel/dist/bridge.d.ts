@@ -4,6 +4,8 @@ export interface BridgeConfig {
     mode: BridgeMode;
     command: string;
     profile?: string;
+    /** RAFT_PROFILE and SLOCK_PROFILE both set with different values. */
+    profileConflict: boolean;
     endpoint: string;
     token: string;
     explicitToken: boolean;

@@ -9,7 +9,7 @@ Slock does not start, stop, or supervise Claude Code. The operator runs Claude C
 In the normal path, the plugin starts and supervises the local bridge-core child process for the current Claude Code session:
 
 ```bash
-SLOCK_PROFILE=<slug> claude --channels plugin:raft-channel@raft
+RAFT_PROFILE=<slug> claude --channels plugin:raft-channel@raft
 ```
 
 The plugin only carries explicit runtime configuration such as the profile slug, loopback endpoint, and per-session wake token. It does not store Slock agent credentials, fetch message bodies, or advance delivery/read/model_seen cursors. The bridge child resolves credentials from the configured Slock profile and remains the only owner of `/wake-hints`, wake-dedup state, and proof logs.
@@ -25,7 +25,7 @@ pnpm install
 pnpm build
 claude plugin marketplace add --scope local /path/to/raft-external-agents
 claude plugin install --scope local raft-channel@raft
-SLOCK_PROFILE=<slug> claude --dangerously-load-development-channels plugin:raft-channel@raft
+RAFT_PROFILE=<slug> claude --dangerously-load-development-channels plugin:raft-channel@raft
 ```
 
 Marketplace/org path:
@@ -36,7 +36,7 @@ Marketplace/org path:
 4. Start Claude Code with the installed channel:
 
 ```bash
-SLOCK_PROFILE=<slug> claude --channels plugin:raft-channel@raft
+RAFT_PROFILE=<slug> claude --channels plugin:raft-channel@raft
 ```
 
 ## Local IPC
@@ -61,7 +61,7 @@ The first wake in a debounce window is injected immediately. Additional wake req
 Set attach mode when you want to run the bridge manually for debugging, headless, or always-on supervision:
 
 ```bash
-SLOCK_PROFILE=<slug> \
+RAFT_PROFILE=<slug> \
 RAFT_CHANNEL_BRIDGE_MODE=attach \
 RAFT_CHANNEL_TOKEN=<manual-shared-token> \
 claude --channels plugin:raft-channel@raft

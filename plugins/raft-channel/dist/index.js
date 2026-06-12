@@ -15460,10 +15460,14 @@ import { spawn } from "node:child_process";
 import readline from "node:readline";
 function readBridgeConfig(env, endpoint, token2, explicitToken2) {
   const mode = env.RAFT_CHANNEL_BRIDGE_MODE === "attach" ? "attach" : "spawn";
+  const raftProfile = env.RAFT_PROFILE?.trim() || void 0;
+  const slockProfile = env.SLOCK_PROFILE?.trim() || void 0;
+  const profileConflict = raftProfile !== void 0 && slockProfile !== void 0 && raftProfile !== slockProfile;
   return {
     mode,
     command: env.RAFT_CHANNEL_BRIDGE_COMMAND || "slock",
-    profile: env.SLOCK_PROFILE?.trim() || void 0,
+    profile: profileConflict ? void 0 : raftProfile ?? slockProfile,
+    profileConflict,
     endpoint,
     token: token2,
     explicitToken: explicitToken2
@@ -15534,6 +15538,7 @@ var BridgeSupervisor = class {
     };
     const env = {
       ...process.env,
+      RAFT_PROFILE: this.config.profile,
       SLOCK_PROFILE: this.config.profile,
       RAFT_CHANNEL_TOKEN: this.config.token
     };
@@ -15661,13 +15666,22 @@ var BridgeSupervisor = class {
         reason: "Plugin is in attach mode; start `slock agent bridge --json` separately."
       };
     }
+    if (config2.profileConflict) {
+      return {
+        mode: "spawn",
+        state: "missing_profile",
+        command: config2.command,
+        endpoint: config2.endpoint,
+        reason: "RAFT_PROFILE and SLOCK_PROFILE are both set with different values; unset one so the bridge never silently picks an identity."
+      };
+    }
     if (!config2.profile) {
       return {
         mode: "spawn",
         state: "missing_profile",
         command: config2.command,
         endpoint: config2.endpoint,
-        reason: "SLOCK_PROFILE is required so the plugin can spawn bridge-core with an explicit profile."
+        reason: "RAFT_PROFILE (or the legacy SLOCK_PROFILE alias) is required so the plugin can spawn bridge-core with an explicit profile."
       };
     }
     return {
@@ -15962,7 +15976,7 @@ console.error(`Raft Claude channel wake endpoint listening at ${wakeServer.url}`
 var bridgeSupervisor = new BridgeSupervisor(readBridgeConfig(process.env, wakeServer.url, token, explicitToken));
 var bridgeStatus = bridgeSupervisor.start();
 if (bridgeStatus.state === "missing_profile") {
-  console.error("Raft bridge child not started: missing_profile. Set SLOCK_PROFILE before starting Claude Code.");
+  console.error("Raft bridge child not started: missing_profile. Set RAFT_PROFILE (or the legacy SLOCK_PROFILE alias) before starting Claude Code.");
 } else if (bridgeStatus.state === "attach_only") {
   console.error("Raft bridge child not started: attach mode. Start `slock agent bridge --json` separately.");
 } else if (bridgeStatus.state === "missing_token") {

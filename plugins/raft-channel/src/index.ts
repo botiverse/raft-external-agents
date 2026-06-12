@@ -100,7 +100,7 @@ console.error(`Raft Claude channel wake endpoint listening at ${wakeServer.url}`
 const bridgeSupervisor = new BridgeSupervisor(readBridgeConfig(process.env, wakeServer.url, token, explicitToken));
 const bridgeStatus = bridgeSupervisor.start();
 if (bridgeStatus.state === "missing_profile") {
-  console.error("Raft bridge child not started: missing_profile. Set SLOCK_PROFILE before starting Claude Code.");
+  console.error("Raft bridge child not started: missing_profile. Set RAFT_PROFILE (or the legacy SLOCK_PROFILE alias) before starting Claude Code.");
 } else if (bridgeStatus.state === "attach_only") {
   console.error("Raft bridge child not started: attach mode. Start `slock agent bridge --json` separately.");
 } else if (bridgeStatus.state === "missing_token") {
