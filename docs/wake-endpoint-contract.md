@@ -20,7 +20,8 @@ token supplied through `RAFT_CHANNEL_TOKEN`.
 - **The runtime component owns exactly two things**:
   1. a localhost HTTP endpoint accepting the wake POST below;
   2. injecting a short, fixed wake notice into the agent's visible context
-     (telling it to run `raft message check`).
+     (telling it to run `raft message check`, with optional `raft profile show`
+     for identity confirmation only).
 - The runtime component holds **no Slock credential** — only the profile slug
   (env, for spawn mode), the endpoint, and a per-session shared token. Message
   bodies never cross this transport; the agent drains them itself via the

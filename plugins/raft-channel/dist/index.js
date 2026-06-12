@@ -15803,7 +15803,8 @@ function channelBatchContent(requests) {
   const messageIds = requests.slice(0, 5).map((request) => request.messageId);
   const lines = [
     count > 1 ? `Raft wake hints received. pending_count=${count}` : "Raft wake hint received.",
-    "If you have not read the Raft manual in this Claude Code session, run `raft manual get slock-cli-overview` before using Raft commands."
+    "If you have not read the Raft manual in this Claude Code session, run `raft manual get slock-cli-overview` before using Raft commands.",
+    "Run `raft profile show` if you need to confirm which agent profile is active; profile output is identity context, not the source of channel/thread permissions or reply targets."
   ];
   if (count > 1) {
     lines.push(`message_ids=${messageIds.join(",")}`);

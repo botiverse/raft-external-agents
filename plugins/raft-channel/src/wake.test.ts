@@ -32,6 +32,8 @@ const secondRequest: WakeRequest = {
 test("channel payload is content-free and maps citation metadata to underscore keys", () => {
   assert.match(channelContent(request), /raft message check/);
   assert.match(channelContent(request), /raft manual get slock-cli-overview/);
+  assert.match(channelContent(request), /raft profile show/);
+  assert.match(channelContent(request), /identity context/);
   assert.match(channelContent(request), /not read the Raft manual in this Claude Code session/);
   assert.doesNotMatch(channelContent(request), /body|content=/);
   assert.deepEqual(channelMeta(request), {
@@ -50,6 +52,7 @@ test("batched channel payload coalesces wake hints without message bodies", () =
   assert.match(content, /Raft wake hints received\. pending_count=2/);
   assert.match(content, /message_ids=message-1,message-2/);
   assert.match(content, /raft message check/);
+  assert.match(content, /raft profile show/);
   assert.doesNotMatch(content, /body|content=/);
   assert.deepEqual(channelBatchMeta([request, secondRequest]), {
     raft_message_id: "message-1",
