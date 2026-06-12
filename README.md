@@ -56,6 +56,28 @@ RAFT_CHANNEL_WAKE_MAX_BATCH_SIZE=20
 The bridge sends `POST /wake` with metadata only. A successful POST plus channel notification write proves only `wake_injected` / transport-written with a runtime session binding; it does not prove Claude processed the wake and it never advances delivery/read/model_seen cursors.
 The first wake in a debounce window is injected immediately. Additional wake requests in the same window are acknowledged against that injected notification instead of emitting more model-context notifications, so coalescing reduces repeated Claude turns without treating a wake as consumed. Set `RAFT_CHANNEL_DEBOUNCE_MS=0` to disable coalescing.
 
+## Activity Reporting
+
+The plugin ships Claude Code hooks (`hooks/hooks.json`) that report agent
+activity with managed-mode parity: tool events carry `toolName` plus capped
+`toolInput`/`toolOutput` content (uniform 4096-char truncation with an explicit
+`truncated` marker), and turn/session lifecycle events
+(`UserPromptSubmit`/`Stop`/`SessionStart`/`SessionEnd`) carry lifecycle facts
+only. `transcript_path` is never read or transmitted, and model thinking/text
+is not reported in v0 (mechanism cost, not a parity boundary — it needs
+transcript/MessageDisplay integration).
+
+Hooks are `async` fire-and-forget and always exit 0, so reporting can never
+block or perturb tool execution. Events flow: hook script → tokenized local
+`POST /activity` (endpoint discovered via a file the plugin writes, keyed by
+the shared Claude Code parent pid) → bounded in-memory queue (cap
+`RAFT_CHANNEL_ACTIVITY_QUEUE_CAP`, default 500, oldest dropped with a
+`dropped` counter surfaced on drain) → the bridge drains
+`GET /activity/drain?max=N` with its existing token and forwards to the Raft
+server under its own credential. The hook itself holds no Raft credential.
+Servers treat these events as self-reported external telemetry (provenance
+`external/plugin-reported`), not authority.
+
 ## Manual Bridge Debugging
 
 Set attach mode when you want to run the bridge manually for debugging, headless, or always-on supervision:

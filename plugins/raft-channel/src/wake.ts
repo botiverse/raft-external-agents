@@ -1,6 +1,8 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 
+import { validateActivityEvent, type ActivityQueue } from "./activity.js";
+
 export interface WakeRequest {
   schema: "raft-channel-wake.v1";
   attemptId: string;
@@ -41,6 +43,8 @@ export interface WakeServerOptions {
   token?: string;
   runtimeSession?: string;
   notifier: ChannelNotifier;
+  /** When present, exposes POST /activity + GET /activity/drain (task #110). */
+  activityQueue?: ActivityQueue;
 }
 
 export interface StartedWakeServer {
@@ -52,7 +56,34 @@ export interface StartedWakeServer {
 export async function startWakeServer(options: WakeServerOptions): Promise<StartedWakeServer> {
   const runtimeSession = options.runtimeSession ?? `claude_${randomUUID()}`;
   const server = http.createServer(async (req, res) => {
-    if (req.method !== "POST" || req.url !== "/wake") {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const tokenOk = !options.token || req.headers["x-raft-bridge-token"] === options.token;
+
+    if (options.activityQueue && url.pathname === "/activity" && req.method === "POST") {
+      if (!tokenOk) {
+        writeJson(res, 401, { ok: false, reason: "Invalid Raft bridge token" });
+        return;
+      }
+      try {
+        options.activityQueue.push(validateActivityEvent(JSON.parse(await readBody(req))));
+        writeJson(res, 202, { ok: true });
+      } catch (err) {
+        writeJson(res, 400, { ok: false, reason: err instanceof Error ? err.message : "Invalid activity event" });
+      }
+      return;
+    }
+
+    if (options.activityQueue && url.pathname === "/activity/drain" && req.method === "GET") {
+      if (!tokenOk) {
+        writeJson(res, 401, { ok: false, reason: "Invalid Raft bridge token" });
+        return;
+      }
+      const max = Number(url.searchParams.get("max") ?? "200");
+      writeJson(res, 200, options.activityQueue.drain(Number.isFinite(max) ? max : 200));
+      return;
+    }
+
+    if (req.method !== "POST" || url.pathname !== "/wake") {
       writeJson(res, 404, {
         ok: false,
         failureClass: "no_session",
@@ -60,7 +91,7 @@ export async function startWakeServer(options: WakeServerOptions): Promise<Start
       });
       return;
     }
-    if (options.token && req.headers["x-raft-bridge-token"] !== options.token) {
+    if (!tokenOk) {
       writeJson(res, 401, {
         ok: false,
         failureClass: "auth_revoked",
@@ -269,7 +300,7 @@ function readBody(req: http.IncomingMessage): Promise<string> {
   });
 }
 
-function writeJson(res: http.ServerResponse, status: number, value: WakeResponse): void {
+function writeJson(res: http.ServerResponse, status: number, value: unknown): void {
   res.writeHead(status, { "content-type": "application/json" });
   res.end(JSON.stringify(value));
 }

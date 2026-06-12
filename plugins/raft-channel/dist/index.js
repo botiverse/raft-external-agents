@@ -3226,8 +3226,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path) {
-      let input = path;
+    function removeDotSegments(path2) {
+      let input = path2;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3479,8 +3479,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path && path !== "/" ? path : void 0;
+        const [path2, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path2 && path2 !== "/" ? path2 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6888,6 +6888,9 @@ var require_dist = __commonJS({
 
 // src/index.ts
 import { randomBytes } from "node:crypto";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 // ../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/core.js
 var _a;
@@ -7130,10 +7133,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path) {
-  if (!path)
+function getElementAtPath(obj, path2) {
+  if (!path2)
     return obj;
-  return path.reduce((acc, key) => acc?.[key], obj);
+  return path2.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -7542,11 +7545,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path, issues) {
+function prefixIssues(path2, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path);
+    iss.path.unshift(path2);
     return iss;
   });
 }
@@ -7693,16 +7696,16 @@ function flattenError(error2, mapper = (issue2) => issue2.message) {
 }
 function formatError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error3, path = []) => {
+  const processError = (error3, path2 = []) => {
     for (const issue2 of error3.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path2, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
       } else {
-        const fullpath = [...path, ...issue2.path];
+        const fullpath = [...path2, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -15455,6 +15458,84 @@ var StdioServerTransport = class {
   }
 };
 
+// src/activity.ts
+var ACTIVITY_EVENT_SCHEMA = "raft-activity.v1";
+var ACTIVITY_DRAIN_SCHEMA = "raft-activity-drain.v1";
+var CONTENT_CAP = 4096;
+var SAFE_SCALAR = /^[a-zA-Z0-9._:@/ -]+$/;
+var MAX_SCALAR_LENGTH = 120;
+function safeScalar(value) {
+  if (typeof value !== "string" || value.length === 0) return void 0;
+  if (value.length > MAX_SCALAR_LENGTH) return void 0;
+  if (!SAFE_SCALAR.test(value)) return void 0;
+  return value;
+}
+var ActivityQueue = class {
+  cap;
+  events = [];
+  droppedSinceDrain = 0;
+  constructor(cap = 500) {
+    this.cap = Math.max(1, cap);
+  }
+  push(event) {
+    this.events.push(event);
+    while (this.events.length > this.cap) {
+      this.events.shift();
+      this.droppedSinceDrain += 1;
+    }
+  }
+  /** Returns up to `max` oldest events and removes them (at-most-once). */
+  drain(max = 200) {
+    const take = Math.max(1, Math.min(max, this.events.length || 1));
+    const events = this.events.splice(0, take);
+    const dropped = this.droppedSinceDrain;
+    this.droppedSinceDrain = 0;
+    return { schema: ACTIVITY_DRAIN_SCHEMA, events, dropped };
+  }
+  get size() {
+    return this.events.length;
+  }
+};
+function validateActivityEvent(value) {
+  if (!value || typeof value !== "object") throw new Error("activity event must be an object");
+  const raw = value;
+  if (raw.schema !== ACTIVITY_EVENT_SCHEMA) throw new Error("unsupported activity event schema");
+  const allowed = /* @__PURE__ */ new Set([
+    "schema",
+    "eventId",
+    "sessionId",
+    "hookEventName",
+    "status",
+    "occurredAt",
+    "toolName",
+    "toolInput",
+    "toolOutput",
+    "truncated",
+    "errorClass"
+  ]);
+  for (const key of Object.keys(raw)) {
+    if (!allowed.has(key)) throw new Error(`activity event field ${key} is not allowed`);
+  }
+  for (const key of ["eventId", "sessionId", "hookEventName", "occurredAt"]) {
+    if (!safeScalar(raw[key])) throw new Error(`activity event ${key} must be a safe non-empty string`);
+  }
+  if (raw.status !== "ok" && raw.status !== "error") throw new Error("activity event status must be ok|error");
+  if (raw.toolName !== void 0 && !safeScalar(raw.toolName)) throw new Error("activity event toolName must be a safe string");
+  if (raw.errorClass !== void 0 && !safeScalar(raw.errorClass)) throw new Error("activity event errorClass must be a safe string");
+  if (raw.truncated !== void 0 && typeof raw.truncated !== "boolean") throw new Error("activity event truncated must be a boolean");
+  const event = raw;
+  for (const key of ["toolInput", "toolOutput"]) {
+    const content = raw[key];
+    if (content === void 0) continue;
+    if (typeof content !== "string") throw new Error(`activity event ${key} must be a string`);
+    if (content.length > CONTENT_CAP) {
+      event[key] = content.slice(0, CONTENT_CAP);
+      event.truncated = true;
+    }
+  }
+  return event;
+}
+
 // src/bridge.ts
 import { spawn } from "node:child_process";
 import readline from "node:readline";
@@ -15706,7 +15787,31 @@ import { randomUUID } from "node:crypto";
 async function startWakeServer(options) {
   const runtimeSession = options.runtimeSession ?? `claude_${randomUUID()}`;
   const server2 = http.createServer(async (req, res) => {
-    if (req.method !== "POST" || req.url !== "/wake") {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const tokenOk = !options.token || req.headers["x-raft-bridge-token"] === options.token;
+    if (options.activityQueue && url.pathname === "/activity" && req.method === "POST") {
+      if (!tokenOk) {
+        writeJson(res, 401, { ok: false, reason: "Invalid Raft bridge token" });
+        return;
+      }
+      try {
+        options.activityQueue.push(validateActivityEvent(JSON.parse(await readBody(req))));
+        writeJson(res, 202, { ok: true });
+      } catch (err) {
+        writeJson(res, 400, { ok: false, reason: err instanceof Error ? err.message : "Invalid activity event" });
+      }
+      return;
+    }
+    if (options.activityQueue && url.pathname === "/activity/drain" && req.method === "GET") {
+      if (!tokenOk) {
+        writeJson(res, 401, { ok: false, reason: "Invalid Raft bridge token" });
+        return;
+      }
+      const max = Number(url.searchParams.get("max") ?? "200");
+      writeJson(res, 200, options.activityQueue.drain(Number.isFinite(max) ? max : 200));
+      return;
+    }
+    if (req.method !== "POST" || url.pathname !== "/wake") {
       writeJson(res, 404, {
         ok: false,
         failureClass: "no_session",
@@ -15714,7 +15819,7 @@ async function startWakeServer(options) {
       });
       return;
     }
-    if (options.token && req.headers["x-raft-bridge-token"] !== options.token) {
+    if (!tokenOk) {
       writeJson(res, 401, {
         ok: false,
         failureClass: "auth_revoked",
@@ -15908,7 +16013,7 @@ var token = process.env.RAFT_CHANNEL_TOKEN || randomBytes(32).toString("base64ur
 var server = new Server(
   {
     name: "raft",
-    version: "0.2.0"
+    version: "0.3.0"
   },
   {
     capabilities: {
@@ -15946,15 +16051,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       text: JSON.stringify({
         wakeEndpoint: wakeServer.url,
         runtimeSession: wakeServer.runtimeSession,
-        bridge: bridgeSupervisor.getStatus()
+        bridge: bridgeSupervisor.getStatus(),
+        activity: {
+          endpoint: wakeServer.url.replace(/\/wake$/, "/activity"),
+          queueSize: activityQueue.size
+        }
       })
     }]
   };
 });
+var activityQueue = new ActivityQueue(parsePositiveInt(process.env.RAFT_CHANNEL_ACTIVITY_QUEUE_CAP, 500));
 var wakeServer = await startWakeServer({
   host,
   port,
   token,
+  activityQueue,
   notifier: new DebouncedWakeNotifier({
     debounceMs: wakeDebounceMs,
     maxBatchSize: wakeMaxBatchSize,
@@ -15973,6 +16084,21 @@ var wakeServer = await startWakeServer({
   })
 });
 console.error(`Raft Claude channel wake endpoint listening at ${wakeServer.url}`);
+var activityEndpoint = wakeServer.url.replace(/\/wake$/, "/activity");
+var discoveryPayload = JSON.stringify({ endpoint: activityEndpoint, token }) + "\n";
+var discoveryFiles = [];
+if (process.env.CLAUDE_PLUGIN_DATA) {
+  discoveryFiles.push(path.join(process.env.CLAUDE_PLUGIN_DATA, `activity-endpoint-${process.ppid}.json`));
+}
+discoveryFiles.push(path.join(tmpdir(), `raft-channel-activity-${process.ppid}.json`));
+for (const file of discoveryFiles) {
+  try {
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, discoveryPayload, { mode: 384 });
+  } catch (err) {
+    console.error(`Raft activity discovery file not written (${file}): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
 var bridgeSupervisor = new BridgeSupervisor(readBridgeConfig(process.env, wakeServer.url, token, explicitToken));
 var bridgeStatus = bridgeSupervisor.start();
 if (bridgeStatus.state === "missing_profile") {
@@ -16003,6 +16129,12 @@ var shuttingDown = false;
 async function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
+  for (const file of discoveryFiles) {
+    try {
+      rmSync(file, { force: true });
+    } catch {
+    }
+  }
   await bridgeSupervisor.stop();
   await wakeServer.close();
   process.exit(0);
