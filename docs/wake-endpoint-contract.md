@@ -8,7 +8,7 @@ already enforces (dedup, stale prune, backoff, reconciliation, observability).
 
 Status: pure development break from the previous channel protocol. Pair
 plugin releases with the matching Slock CLI release. The bridge invokes it via
-`--wake-adapter raft-channel --raft-channel-endpoint <url>` with the shared
+`--wake-adapter wake-channel --wake-channel-endpoint <url>` with the shared
 token supplied through `RAFT_CHANNEL_TOKEN`.
 
 ## Division of labor (wake-only convergence, #wg-external-agent 2026-06-11)
