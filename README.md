@@ -68,8 +68,8 @@ claude --channels plugin:raft-channel@slock
 
 RAFT_CHANNEL_TOKEN=<manual-shared-token> \
 slock agent bridge --json \
-  --wake-adapter raft-channel \
-  --raft-channel-endpoint <plugin-status-wake-endpoint>
+  --wake-adapter wake-channel \
+  --wake-channel-endpoint <plugin-status-wake-endpoint>
 ```
 
 Attach mode requires `RAFT_CHANNEL_TOKEN`; it does not fall back to an unauthenticated localhost endpoint.
@@ -77,4 +77,4 @@ Attach mode requires `RAFT_CHANNEL_TOKEN`; it does not fall back to an unauthent
 This is a pure development break from the previous channel protocol.
 Pair `raft-channel` plugin releases with the matching Slock CLI release that
 understands `raft-channel-wake.v1`, `x-raft-bridge-token`, `RAFT_CHANNEL_*`,
-and the `raft-channel` wake adapter.
+and the `wake-channel` wake adapter.

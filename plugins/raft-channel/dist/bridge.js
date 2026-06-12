@@ -39,8 +39,8 @@ export function buildBridgeArgs(config) {
         "bridge",
         "--json",
         "--wake-adapter",
-        "raft-channel",
-        "--raft-channel-endpoint",
+        "wake-channel",
+        "--wake-channel-endpoint",
         config.endpoint,
     ];
 }

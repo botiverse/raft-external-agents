@@ -18,8 +18,8 @@ test("bridge args do not expose the wake token", () => {
     "bridge",
     "--json",
     "--wake-adapter",
-    "raft-channel",
-    "--raft-channel-endpoint",
+    "wake-channel",
+    "--wake-channel-endpoint",
     "http://127.0.0.1:49152/wake",
   ]);
   assert.deepEqual(buildBridgeStatusArgs(config), [
@@ -27,8 +27,8 @@ test("bridge args do not expose the wake token", () => {
     "bridge",
     "--json",
     "--wake-adapter",
-    "raft-channel",
-    "--raft-channel-endpoint",
+    "wake-channel",
+    "--wake-channel-endpoint",
     "http://127.0.0.1:49152/wake",
   ]);
 });
@@ -114,11 +114,11 @@ test("bridge child spawn plan: quoted shell string on win32, direct argv elsewhe
   const direct = bridgeSpawnPlan("linux", "slock", ["agent", "bridge", "--json"]);
   assert.deepEqual(direct, { command: "slock", args: ["agent", "bridge", "--json"], options: { shell: false } });
 
-  const win = bridgeSpawnPlan("win32", "C:\\Program Files\\slock\\slock.cmd", ["agent", "bridge", "--raft-channel-endpoint", "http://127.0.0.1:8646/wake"]);
+  const win = bridgeSpawnPlan("win32", "C:\\Program Files\\slock\\slock.cmd", ["agent", "bridge", "--wake-channel-endpoint", "http://127.0.0.1:8646/wake"]);
   assert.equal(win.options.shell, true);
   assert.deepEqual(win.args, [], "win32 must pass a single string, not an args array (DEP0190)");
   assert.equal(
     win.command,
-    '"C:\\Program Files\\slock\\slock.cmd" "agent" "bridge" "--raft-channel-endpoint" "http://127.0.0.1:8646/wake"',
+    '"C:\\Program Files\\slock\\slock.cmd" "agent" "bridge" "--wake-channel-endpoint" "http://127.0.0.1:8646/wake"',
   );
 });
