@@ -15548,10 +15548,12 @@ function readBridgeConfig(env, endpoint, token2, explicitToken2) {
   const raftProfile = env.RAFT_PROFILE?.trim() || void 0;
   const slockProfile = env.SLOCK_PROFILE?.trim() || void 0;
   const profileConflict = raftProfile !== void 0 && slockProfile !== void 0 && raftProfile !== slockProfile;
+  const expectedAgentId = env.RAFT_EXPECTED_AGENT_ID?.trim() || void 0;
   return {
     mode,
     command: env.RAFT_CHANNEL_BRIDGE_COMMAND || "slock",
     profile: profileConflict ? void 0 : raftProfile ?? slockProfile,
+    expectedAgentId,
     profileConflict,
     endpoint,
     token: token2,
@@ -15577,7 +15579,9 @@ function buildBridgeArgs(config2) {
     "--wake-adapter",
     "wake-channel",
     "--wake-channel-endpoint",
-    config2.endpoint
+    config2.endpoint,
+    "--expected-agent",
+    config2.expectedAgentId
   ];
 }
 function buildBridgeStatusArgs(config2) {
@@ -15607,6 +15611,9 @@ var BridgeSupervisor = class {
     if (!this.config.profile) {
       return this.status;
     }
+    if (!this.config.expectedAgentId) {
+      return this.status;
+    }
     if (this.child) {
       return this.status;
     }
@@ -15618,6 +15625,7 @@ var BridgeSupervisor = class {
       command: this.config.command,
       args: statusArgs,
       profile: this.config.profile,
+      expectedAgentId: this.config.expectedAgentId,
       endpoint: this.config.endpoint,
       startedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
@@ -15625,6 +15633,7 @@ var BridgeSupervisor = class {
       ...process.env,
       RAFT_PROFILE: this.config.profile,
       SLOCK_PROFILE: this.config.profile,
+      RAFT_EXPECTED_AGENT_ID: this.config.expectedAgentId,
       RAFT_CHANNEL_TOKEN: this.config.token
     };
     const plan = bridgeSpawnPlan(process.platform, this.config.command, args);
@@ -15708,7 +15717,7 @@ var BridgeSupervisor = class {
     if (!this.child) {
       this.status = {
         ...this.status,
-        state: this.status.state === "attach_only" || this.status.state === "missing_profile" || this.status.state === "missing_token" ? this.status.state : "stopped"
+        state: this.status.state === "attach_only" || this.status.state === "missing_profile" || this.status.state === "missing_expected_agent" || this.status.state === "missing_token" ? this.status.state : "stopped"
       };
       return;
     }
@@ -15769,11 +15778,22 @@ var BridgeSupervisor = class {
         reason: "RAFT_PROFILE (or the legacy SLOCK_PROFILE alias) is required so the plugin can spawn bridge-core with an explicit profile."
       };
     }
+    if (!config2.expectedAgentId) {
+      return {
+        mode: "spawn",
+        state: "missing_expected_agent",
+        command: config2.command,
+        profile: config2.profile,
+        endpoint: config2.endpoint,
+        reason: "RAFT_EXPECTED_AGENT_ID is required so bridge-core can reject a profile that resolves to the wrong Agent before sending any request."
+      };
+    }
     return {
       mode: "spawn",
       state: "starting",
       command: config2.command,
       profile: config2.profile,
+      expectedAgentId: config2.expectedAgentId,
       endpoint: config2.endpoint
     };
   }
@@ -16107,6 +16127,8 @@ var bridgeSupervisor = new BridgeSupervisor(readBridgeConfig(process.env, wakeSe
 var bridgeStatus = bridgeSupervisor.start();
 if (bridgeStatus.state === "missing_profile") {
   console.error("Raft bridge child not started: missing_profile. Set RAFT_PROFILE (or the legacy SLOCK_PROFILE alias) before starting Claude Code.");
+} else if (bridgeStatus.state === "missing_expected_agent") {
+  console.error("Raft bridge child not started: missing_expected_agent. Set RAFT_EXPECTED_AGENT_ID from the Raft Agent setup surface before starting Claude Code.");
 } else if (bridgeStatus.state === "attach_only") {
   console.error("Raft bridge child not started: attach mode. Start `slock agent bridge --json` separately.");
 } else if (bridgeStatus.state === "missing_token") {

@@ -9,10 +9,10 @@ Slock does not start, stop, or supervise Claude Code. The operator runs Claude C
 In the normal path, the plugin starts and supervises the local bridge-core child process for the current Claude Code session:
 
 ```bash
-RAFT_PROFILE=<slug> claude --channels plugin:raft-channel@raft
+RAFT_EXPECTED_AGENT_ID=<agent-id> RAFT_PROFILE=<slug> claude --channels plugin:raft-channel@raft
 ```
 
-The plugin only carries explicit runtime configuration such as the profile slug, loopback endpoint, and per-session wake token. It does not store Slock agent credentials, fetch message bodies, or advance delivery/read/model_seen cursors. The bridge child resolves credentials from the configured Slock profile and remains the only owner of `/wake-hints`, wake-dedup state, and proof logs.
+The plugin only carries explicit runtime configuration such as the independently expected Agent id, profile slug, loopback endpoint, and per-session wake token. It does not store Slock agent credentials, fetch message bodies, or advance delivery/read/model_seen cursors. The bridge child resolves credentials from the configured Slock profile, verifies that identity against `RAFT_EXPECTED_AGENT_ID` before sending any request, and remains the only owner of `/wake-hints`, wake-dedup state, and proof logs.
 
 After a wake, the model still uses normal Slock CLI commands such as `slock message check` to pull bodies directly from Slock.
 
@@ -25,7 +25,7 @@ pnpm install
 pnpm build
 claude plugin marketplace add --scope local /path/to/raft-external-agents
 claude plugin install --scope local raft-channel@raft
-RAFT_PROFILE=<slug> claude --dangerously-load-development-channels plugin:raft-channel@raft
+RAFT_EXPECTED_AGENT_ID=<agent-id> RAFT_PROFILE=<slug> claude --dangerously-load-development-channels plugin:raft-channel@raft
 ```
 
 Marketplace/org path:
@@ -36,7 +36,7 @@ Marketplace/org path:
 4. Start Claude Code with the installed channel:
 
 ```bash
-RAFT_PROFILE=<slug> claude --channels plugin:raft-channel@raft
+RAFT_EXPECTED_AGENT_ID=<agent-id> RAFT_PROFILE=<slug> claude --channels plugin:raft-channel@raft
 ```
 
 ## Local IPC
@@ -86,12 +86,14 @@ Set attach mode when you want to run the bridge manually for debugging, headless
 
 ```bash
 RAFT_PROFILE=<slug> \
+RAFT_EXPECTED_AGENT_ID=<agent-id> \
 RAFT_CHANNEL_BRIDGE_MODE=attach \
 RAFT_CHANNEL_TOKEN=<manual-shared-token> \
 claude --channels plugin:raft-channel@raft
 
 RAFT_CHANNEL_TOKEN=<manual-shared-token> \
 slock agent bridge --json \
+  --expected-agent <agent-id> \
   --wake-adapter wake-channel \
   --wake-channel-endpoint <plugin-status-wake-endpoint>
 ```

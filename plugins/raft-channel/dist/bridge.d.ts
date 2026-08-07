@@ -1,9 +1,11 @@
 export type BridgeMode = "spawn" | "attach";
-export type BridgeState = "attach_only" | "missing_profile" | "missing_token" | "starting" | "running" | "spawn_error" | "exited" | "restarting" | "stopped";
+export type BridgeState = "attach_only" | "missing_profile" | "missing_expected_agent" | "missing_token" | "starting" | "running" | "spawn_error" | "exited" | "restarting" | "stopped";
 export interface BridgeConfig {
     mode: BridgeMode;
     command: string;
     profile?: string;
+    /** Independent launcher intent; never derived from the profile file. */
+    expectedAgentId?: string;
     /** RAFT_PROFILE and SLOCK_PROFILE both set with different values. */
     profileConflict: boolean;
     endpoint: string;
@@ -16,6 +18,7 @@ export interface BridgeStatus {
     command?: string;
     args?: string[];
     profile?: string;
+    expectedAgentId?: string;
     endpoint: string;
     pid?: number;
     startedAt?: string;
