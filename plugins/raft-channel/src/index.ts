@@ -133,6 +133,8 @@ const bridgeSupervisor = new BridgeSupervisor(readBridgeConfig(process.env, wake
 const bridgeStatus = bridgeSupervisor.start();
 if (bridgeStatus.state === "missing_profile") {
   console.error("Raft bridge child not started: missing_profile. Set RAFT_PROFILE (or the legacy SLOCK_PROFILE alias) before starting Claude Code.");
+} else if (bridgeStatus.state === "missing_expected_agent") {
+  console.error("Raft bridge child not started: missing_expected_agent. Set RAFT_EXPECTED_AGENT_ID from the Raft Agent setup surface before starting Claude Code.");
 } else if (bridgeStatus.state === "attach_only") {
   console.error("Raft bridge child not started: attach mode. Start `slock agent bridge --json` separately.");
 } else if (bridgeStatus.state === "missing_token") {

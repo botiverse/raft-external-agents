@@ -32,6 +32,7 @@ test("plugin shuts down bridge child when MCP stdin ends", async () => {
       env: {
         ...process.env,
         SLOCK_PROFILE: "agent-profile",
+        RAFT_EXPECTED_AGENT_ID: "agent-1",
         RAFT_CHANNEL_BRIDGE_COMMAND: bridgeCommand,
         RAFT_CHANNEL_PORT: "0",
         BRIDGE_STARTED_FILE: startedFile,

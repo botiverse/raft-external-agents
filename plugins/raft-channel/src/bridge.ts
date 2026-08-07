@@ -6,6 +6,7 @@ export type BridgeMode = "spawn" | "attach";
 export type BridgeState =
   | "attach_only"
   | "missing_profile"
+  | "missing_expected_agent"
   | "missing_token"
   | "starting"
   | "running"
@@ -18,6 +19,8 @@ export interface BridgeConfig {
   mode: BridgeMode;
   command: string;
   profile?: string;
+  /** Independent launcher intent; never derived from the profile file. */
+  expectedAgentId?: string;
   /** RAFT_PROFILE and SLOCK_PROFILE both set with different values. */
   profileConflict: boolean;
   endpoint: string;
@@ -31,6 +34,7 @@ export interface BridgeStatus {
   command?: string;
   args?: string[];
   profile?: string;
+  expectedAgentId?: string;
   endpoint: string;
   pid?: number;
   startedAt?: string;
@@ -50,10 +54,12 @@ export function readBridgeConfig(env: NodeJS.ProcessEnv, endpoint: string, token
   const raftProfile = env.RAFT_PROFILE?.trim() || undefined;
   const slockProfile = env.SLOCK_PROFILE?.trim() || undefined;
   const profileConflict = raftProfile !== undefined && slockProfile !== undefined && raftProfile !== slockProfile;
+  const expectedAgentId = env.RAFT_EXPECTED_AGENT_ID?.trim() || undefined;
   return {
     mode,
     command: env.RAFT_CHANNEL_BRIDGE_COMMAND || "slock",
     profile: profileConflict ? undefined : raftProfile ?? slockProfile,
+    expectedAgentId,
     profileConflict,
     endpoint,
     token,
@@ -97,6 +103,8 @@ export function buildBridgeArgs(config: BridgeConfig): string[] {
     "wake-channel",
     "--wake-channel-endpoint",
     config.endpoint,
+    "--expected-agent",
+    config.expectedAgentId!,
   ];
 }
 
@@ -138,6 +146,9 @@ export class BridgeSupervisor {
     if (!this.config.profile) {
       return this.status;
     }
+    if (!this.config.expectedAgentId) {
+      return this.status;
+    }
     if (this.child) {
       return this.status;
     }
@@ -150,6 +161,7 @@ export class BridgeSupervisor {
       command: this.config.command,
       args: statusArgs,
       profile: this.config.profile,
+      expectedAgentId: this.config.expectedAgentId,
       endpoint: this.config.endpoint,
       startedAt: new Date().toISOString(),
     };
@@ -162,6 +174,7 @@ export class BridgeSupervisor {
       ...process.env,
       RAFT_PROFILE: this.config.profile,
       SLOCK_PROFILE: this.config.profile,
+      RAFT_EXPECTED_AGENT_ID: this.config.expectedAgentId,
       RAFT_CHANNEL_TOKEN: this.config.token,
     };
 
@@ -258,7 +271,7 @@ export class BridgeSupervisor {
     if (!this.child) {
       this.status = {
         ...this.status,
-        state: this.status.state === "attach_only" || this.status.state === "missing_profile" || this.status.state === "missing_token" ? this.status.state : "stopped",
+        state: this.status.state === "attach_only" || this.status.state === "missing_profile" || this.status.state === "missing_expected_agent" || this.status.state === "missing_token" ? this.status.state : "stopped",
       };
       return;
     }
@@ -322,11 +335,22 @@ export class BridgeSupervisor {
         reason: "RAFT_PROFILE (or the legacy SLOCK_PROFILE alias) is required so the plugin can spawn bridge-core with an explicit profile.",
       };
     }
+    if (!config.expectedAgentId) {
+      return {
+        mode: "spawn",
+        state: "missing_expected_agent",
+        command: config.command,
+        profile: config.profile,
+        endpoint: config.endpoint,
+        reason: "RAFT_EXPECTED_AGENT_ID is required so bridge-core can reject a profile that resolves to the wrong Agent before sending any request.",
+      };
+    }
     return {
       mode: "spawn",
       state: "starting",
       command: config.command,
       profile: config.profile,
+      expectedAgentId: config.expectedAgentId,
       endpoint: config.endpoint,
     };
   }
