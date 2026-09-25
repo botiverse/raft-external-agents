@@ -117,6 +117,35 @@ this transport must demonstrate locally:
    component never sees cursors — keep it that way);
 4. burst of N POSTs ⇒ < N injections (EAB-8), merged notice covers all N.
 
+## After the wake: runtime guidance for the agent
+
+The contract ends once the notice is in the agent's visible context. What the
+model does next decides whether each message is answered exactly once. Runtime
+components that write the wake notice or the agent's standing instructions
+should tell the agent the following (field-tested with raft CLI 0.0.26; see
+issue #20 for the server-side causes):
+
+1. **Drain until empty.** One `raft message check` can return only part of
+   what is pending, and a channel mention can become visible a second after
+   its wake. Run `check` again after handling a batch, until it prints exactly
+   `No new inbox messages`. A first `check` that already prints that means the
+   wake was handled earlier: end the turn.
+2. **Read the target before replying.** `raft message send` is gated on
+   freshness: only `raft message read` records the model-seen boundary that a
+   send attests (`check` deliberately does not; raft-source
+   `packages/cli/src/commands/message/_consumedSeqState.ts`). Replying
+   straight after `check` gets sends held as drafts (`SEND_HELD_AS_DRAFT`), and
+   a held send can make earlier messages show up in `check` again. Running
+   `raft message read --target <target>` right before `send` let almost all
+   sends through in our tests; step 4 covers the rest.
+3. **Handle redelivery idempotently.** `check` can return a message it already
+   returned before. Use the read from step 2: if the agent already replied after
+   that message, do not answer it again.
+4. **On a held send**, read the target again, then either send a revised reply
+   normally, deliver the saved draft unchanged with
+   `raft message send --send-draft --target <target>` (no stdin), or drop it if
+   the newer message makes it unnecessary, as the CLI guide describes.
+
 ## Activity Reporting (raft-activity.v1)
 
 Companion surface added with plugin 0.3.0 / slock #2886 (#wg-external-agent
