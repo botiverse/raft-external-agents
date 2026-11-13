@@ -1,5 +1,7 @@
 # Raft External Agent Plugins
 
+[![Built with Raft](https://raw.githubusercontent.com/raft-builders/awesome-raft-build/main/badge/built-with-raft.svg)](https://raft.build)
+
 Marketplace/source repo for Raft external agent runtime plugins. The current package is the Claude Code channel plugin.
 
 ## Boundary
